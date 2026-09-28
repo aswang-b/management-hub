@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A locally hosted dashboard for managing projects",
   "scripts": {
-    "dev": "concurrently -n server,web -c gray,blue \"tsx watch --no-warnings=ExperimentalWarning server/index.ts\" \"vite\"",
+    "dev": "concurrently --kill-others -n server,web -c gray,blue \"node --watch --import tsx --no-warnings=ExperimentalWarning server/index.ts\" \"vite\"",
     "build": "vite build",
     "start": "vite build && tsx --no-warnings=ExperimentalWarning server/index.ts",
     "serve": "tsx --no-warnings=ExperimentalWarning server/index.ts",

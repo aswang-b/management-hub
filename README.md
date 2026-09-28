@@ -82,7 +82,7 @@ Your computer needs to be on for the phone to reach it.
 |---|---|
 | `npm start` | Build the page and run the hub |
 | `npm run serve` | Run the hub without rebuilding the page (faster, if nothing changed) |
-| `npm run dev` | Run with live reload while changing the code (page on port 5173) |
+| `npm run dev` | Run with live reload while changing the code (page on port 5173). Press Ctrl+C to stop it |
 | `npm test` | Run the plugin tests |
 | `npm run typecheck` | Check the code for type errors |
 | `npm run check-plugins` | Try every plugin tile against the real services and report which ones fail |

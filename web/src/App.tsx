@@ -120,7 +120,7 @@ function NewProject({ onCreate, onClose }: { onCreate: (name: string) => void; o
       >
         <label className="field">
           <span>Name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="bachata-website" autoFocus required />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bachata Website" autoFocus required />
         </label>
         <div className="form-actions">
           <span className="grow" />
