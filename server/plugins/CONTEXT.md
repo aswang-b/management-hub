@@ -12,6 +12,9 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 - `configFields`: settings asked for in builder mode (e.g. repository)
 - `load(ctx)`: returns a `PluginView` (status, stats, sections, actions, links)
 - `actions`: named functions for buttons; return a short message
+- `collect(ctx)` (optional): numbers to save hourly for analytics, as
+  `{ metric, value, tags? }`. Add a `<metric>.limit` point for a gauge.
+  Used by `resend` and `netlify`.
 
 ## Helpers
 - `request(url, opts)`: HTTP with errors turned into plain-language messages.
@@ -24,6 +27,7 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 ## `index.ts`
 - `runLoad`: caches results 60 s per tile + config.
 - `runAction`: runs an action, then clears that tile's cache.
+- `runCollect`: runs `collect`; never throws, returns `{ ok, points, error }`.
 - `ctx.secret(key)` throws a setup error naming the missing `.env` key.
 
 ## Adding a plugin (checklist)
@@ -33,4 +37,5 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 4. Row in the README plugin table.
 5. Tests in `plugins.test.ts` (network is faked) for `load` and each action.
 6. Actions that delete or publish set `confirm`.
+7. Numbers worth charting: add `collect` and a test for it.
 No page changes should be needed.

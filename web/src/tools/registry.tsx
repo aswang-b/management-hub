@@ -5,6 +5,7 @@ import type { PluginConfigField, PluginMeta, Tool, ToolCategory } from "../../..
 import { LinkTool } from "./LinkTool.tsx";
 import { NotesModule } from "./NotesModule.tsx";
 import { PluginTool } from "./PluginTool.tsx";
+import { AnalyticsModule, analyticsDef } from "./AnalyticsModule.tsx";
 
 export interface Size {
   w: number;
@@ -25,6 +26,10 @@ export interface ToolDef {
   /** Plugin tokens and whether they're set in .env. */
   env?: PluginMeta["env"];
   render(tool: Tool, onData: (data: Tool["data"]) => void): ReactNode;
+  /** Loads choices for "select" fields (and a note) when the settings open. */
+  loadSettings?(): Promise<{ options?: Record<string, NonNullable<PluginConfigField["options"]>>; note?: string }>;
+  /** An extra button in the settings, e.g. "Collect now". Returns a message to show. */
+  settingsAction?: { label: string; run(): Promise<string> };
 }
 
 const LINK_SIZES: Size[] = [
@@ -67,6 +72,7 @@ export function buildRegistry(plugins: PluginMeta[]): ToolDef[] {
       configFields: [],
       render: (tool, onData) => <NotesModule tool={tool} onData={onData} />,
     },
+    { ...analyticsDef, render: (tool) => <AnalyticsModule tool={tool} /> },
     ...plugins.map(
       (p): ToolDef => ({
         key: `plugin:${p.id}`,

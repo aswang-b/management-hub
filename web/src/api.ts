@@ -1,5 +1,6 @@
 // Calls to the hub's local server.
 import type { PluginMeta, PluginResult, Project, Tool } from "../../shared/types.ts";
+import type { AnalyticsResult, CollectRun, Series } from "../../shared/metrics.ts";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -28,6 +29,10 @@ export const api = {
   pluginView: (toolId: string, fresh = false) => call<PluginResult>("GET", `/tools/${toolId}/plugin${fresh ? "?fresh=1" : ""}`),
   pluginAction: (toolId: string, action: string, args?: Record<string, unknown>) =>
     call<{ ok: boolean; message?: string; error?: string }>("POST", `/tools/${toolId}/plugin/actions/${action}`, { args }),
+
+  metrics: () => call<{ series: Series[]; lastRun: CollectRun | null }>("GET", "/metrics"),
+  collectMetrics: () => call<CollectRun>("POST", "/metrics/collect", {}),
+  analytics: (toolId: string) => call<AnalyticsResult>("GET", `/tools/${toolId}/analytics`),
 
   linkInfo: (url: string) => call<{ title: string; local?: boolean; error?: string }>("GET", `/link-info?url=${encodeURIComponent(url)}`),
   openLocal: (target: string) => call<{ ok: boolean; error?: string }>("POST", "/open", { target }),

@@ -51,7 +51,7 @@ three jobs into one page.
 | Link tool in 3 sizes (1, 2 or 3 squares wide, 1 tall), showing the site's icon, and its name when 2 or 3 wide | Yes |
 | Notes module: rich text with lists, numbering, highlighting and text color, saved with the project | Yes |
 | Plugins for the `bachata-website` services (section 1) | Yes, with the gaps listed there |
-| Second module: generic analytics that outside sources can send data into (section 2) | **No.** Design below |
+| Second module: generic analytics that outside sources can send data into (section 2) | **Partly.** Storage, hourly pull from plugins and the chart tile are built; push and import aren't |
 | Usable as a phone app while hosted on the computer (section 4) | Yes, without offline caching |
 
 ---
@@ -100,7 +100,7 @@ deploys, Netlify deploy locking and build hooks.
 
 ---
 
-## 2. The analytics module (not built yet)
+## 2. The analytics module (partly built)
 
 One module that can chart numbers from anywhere. Keep **getting data in**
 separate from **showing it**.
@@ -147,6 +147,23 @@ combine values (sum, average, latest, count). The display fits the tile size:
 
 Chart library: Recharts or uPlot (easy to keep black/white).
 
+**Built?** Partly:
+
+- The `metrics` table (`server/metrics.ts`). A reading for the same metric,
+  tags and hour replaces the old one, so re-running a collection doesn't
+  double-count. A limit is saved as a second metric named `<metric>.limit`,
+  and the tile finds it by itself.
+- Pull: plugins can have a `collect` step; `server/collector.ts` runs it for
+  every plugin tile when the hub starts (if this hour isn't done) and then
+  hourly. Resend (emails today/month, bounces, limits) and Netlify
+  (bandwidth and allowance) save numbers.
+- The Analytics tile with all four displays, sum/average/latest/count, a
+  "Collect now" button, and Recharts for the full chart.
+
+**Not yet:** push (`POST /api/ingest` with per-source keys), CSV/JSON
+import, and other plugins saving numbers (GitHub traffic, Cloudflare,
+Supabase database size).
+
 ---
 
 ## 3. Language and framework
@@ -159,7 +176,7 @@ Chart library: Recharts or uPlot (easy to keep black/white).
 | Page | React + Vite | Largest ecosystem; the two hardest parts exist as React libraries. |
 | Grid and builder mode | `react-grid-layout` | Drag, drop and resize on a column grid; 4 to 12 columns is a setting. |
 | Notes | Tiptap | Lists, numbering, highlight and text color are official extensions. |
-| Charts | Recharts or uPlot | Simple, easy to theme. |
+| Charts | Recharts | Simple, easy to theme. Written like the rest of the page. |
 | Server | Hono | Tiny. Serves the page, stores data, calls APIs with your tokens. |
 | Storage | SQLite (Node's built-in) | No database server. Back up by copying one file. |
 | Run it | `npm start` | One command, one process. |
@@ -169,7 +186,7 @@ but the grid builder and rich-text editor are much harder without the
 libraries above. **Next.js / SvelteKit** add concepts a one-person local app
 doesn't need.
 
-**Built?** Yes, as above (charts wait for the analytics module).
+**Built?** Yes, as above.
 
 ---
 

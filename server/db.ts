@@ -88,6 +88,11 @@ export function listTools(projectId: number): Tool[] {
   return (db.prepare("SELECT * FROM tools WHERE project_id = ? ORDER BY y, x").all(projectId) as Row[]).map(toTool);
 }
 
+/** Every plugin tile in every project (for the hourly metrics collection). */
+export function listPluginTools(): Tool[] {
+  return (db.prepare("SELECT * FROM tools WHERE category = 'plugin' ORDER BY project_id, y, x").all() as Row[]).map(toTool);
+}
+
 export function getTool(id: string): Tool | undefined {
   const r = db.prepare("SELECT * FROM tools WHERE id = ?").get(id) as Row | undefined;
   return r && toTool(r);

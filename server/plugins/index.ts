@@ -1,6 +1,7 @@
 // The list of plugins the hub offers. To add a service, create a file next
 // to this one that exports a `Plugin` and add it here.
 import type { PluginMeta, PluginResult } from "../../shared/types.ts";
+import type { MetricPoint } from "../../shared/metrics.ts";
 import { PluginError, type Plugin, type PluginContext } from "./framework.ts";
 import { github } from "./github.ts";
 import { supabase } from "./supabase.ts";
@@ -61,6 +62,16 @@ export async function runLoad(p: Plugin, toolId: string, config: Record<string, 
   }
   cache.set(key, { at: Date.now(), result });
   return result;
+}
+
+/** Runs a plugin's `collect` for one tile. Never throws: failures come back as `error`. */
+export async function runCollect(p: Plugin, config: Record<string, unknown>): Promise<{ ok: boolean; points: MetricPoint[]; error?: string }> {
+  if (!p.collect) return { ok: true, points: [] };
+  try {
+    return { ok: true, points: await p.collect(context(config)) };
+  } catch (e) {
+    return { ok: false, points: [], error: describe(e).error };
+  }
 }
 
 export async function runAction(p: Plugin, toolId: string, config: Record<string, unknown>, action: string, args: Record<string, unknown>) {

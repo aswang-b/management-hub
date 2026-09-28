@@ -73,10 +73,13 @@ export interface PluginResult {
 export interface PluginConfigField {
   key: string;
   label: string;
+  /** Example text; for a "select", the value chosen at first. */
   placeholder?: string;
   help?: string;
   required?: boolean;
-  type?: "text" | "number";
+  type?: "text" | "number" | "select";
+  /** Choices for a "select" field. */
+  options?: { value: string; label: string }[];
 }
 
 export interface PluginMeta {

@@ -11,11 +11,19 @@ The React page. Built by Vite into `web/dist`, which the server serves.
   On phones (< 640 px) links sit 4 per row and everything else is full width.
 - `components/Palette.tsx`: list of tools to drag in, with size shapes.
 - `components/ToolSettings.tsx`, `ProjectSettings.tsx`, `Modal.tsx`: dialogs.
+- In `npm run dev`, Vite forwards `/api` without changing the Host header
+  (`changeOrigin: false`), or the server's cross-site check refuses changes.
 - `tools/registry.tsx`: every tool type and its allowed sizes. Plugins are
   added automatically from the server's plugin list (`buildRegistry`).
 - `tools/LinkTool.tsx`: a link or local file with favicon.
 - `tools/NotesModule.tsx`: rich-text notes (TipTap), saved to the tile's `data`.
 - `tools/PluginTool.tsx`: draws any `PluginView` generically.
+- `tools/AnalyticsModule.tsx`: the analytics tile and its definition
+  (`analyticsDef`: sizes, settings, metric list, "Collect now"). Display
+  depends on size: 1×1 number, 1 tall sparkline, 2+ tall full chart.
+- `tools/charts.tsx`: `Sparkline` (hand-drawn SVG) and `FullChart` (Recharts).
+- `components/ToolSettings.tsx` supports `select` fields, choices loaded by
+  a tool's `loadSettings()`, and one extra button (`settingsAction`).
 - `styles.css`: the theme.
 
 ## Patterns

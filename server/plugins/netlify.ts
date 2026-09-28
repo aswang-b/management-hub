@@ -99,6 +99,20 @@ export const netlify: Plugin = {
     };
   },
 
+  // Saved every hour for analytics tiles. Bandwidth is counted per Netlify
+  // team (account), so it's tagged with the team, not the site.
+  async collect(ctx) {
+    const s = await nf(ctx, `/sites/${encodeURIComponent(site(ctx))}`);
+    expectShape(s && typeof s.id === "string" && s.account_slug, "Netlify", "site details");
+    const bw = await nf(ctx, `/accounts/${s.account_slug}/bandwidth`);
+    expectShape(Number.isFinite(bw?.used), "Netlify", "bandwidth");
+    const tags = { account: String(s.account_slug) };
+    return [
+      { metric: "netlify.bandwidth_bytes", value: bw.used, tags },
+      ...(bw.included > 0 ? [{ metric: "netlify.bandwidth_bytes.limit", value: bw.included, tags }] : []),
+    ];
+  },
+
   actions: {
     async build(ctx) {
       const s = await nf(ctx, `/sites/${encodeURIComponent(site(ctx))}`);

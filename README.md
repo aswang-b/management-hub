@@ -26,8 +26,9 @@ The original request, what's built so far and what's planned are in
 - **Tools** come in three kinds:
   - **Links** (1, 2 or 3 squares wide) open a website or a file on your
     computer. They show the site's icon, and its name when wider than one square.
-  - **Modules** are built into the hub. For now: **Notes**, rich text with
-    lists, numbering, highlights and text colors.
+  - **Modules** are built into the hub: **Notes**, rich text with lists,
+    numbering, highlights and text colors, and **Analytics**, charts of
+    numbers the hub saves every hour (see [Analytics](#analytics)).
   - **Plugins** show live information from a service and let you take its most
     common maintenance actions without opening the service's website:
 
@@ -42,6 +43,38 @@ The original request, what's built so far and what's planned are in
 | Service status | Live status of GitHub, Supabase, Cloudflare, Netlify and Resend | – |
 
 Buttons that change something important ask before running.
+
+## Analytics
+
+Every hour, the hub saves a few numbers from the Resend and Netlify tiles in
+your projects:
+
+| From | Numbers |
+|---|---|
+| Resend | Emails sent today and this month (with your daily and monthly limits), bounces this month |
+| Netlify | Bandwidth used this period (with your plan's allowance) |
+
+An **Analytics** tile (under Modules in builder mode) charts one of these
+numbers. Its settings (⚙) pick the number, the time range (24 hours to 90
+days) and how to combine readings. What it shows depends on its size:
+
+- **1 × 1**: the number, with the change against the period before (↑ 12%).
+- **2 or 3 wide, 1 tall**: the number and a small line chart.
+- **2 tall or more**: a full chart. Point at it to see each reading.
+
+When a number has a limit, the tile also shows a bar like "79% of 3,000"
+and a dashed limit line. Past 80% it shows ▲; past 100% the tile turns
+black. The limit comes from the plugin (e.g. your Resend plan). Type a
+different one in the tile's settings, or 0 for none.
+
+Good to know:
+
+- **Numbers are only saved while the hub is running.** Time when your
+  computer was off shows as a gap in the chart.
+- A new tile has nothing to show until the first save. The hub saves a few
+  seconds after it starts, then every hour. **Collect now** in the tile's
+  settings saves straight away.
+- If a plugin can't save its numbers, the tile's settings say why.
 
 ## Setup
 
@@ -60,7 +93,7 @@ Plugins without a token show what to add.
 `.env.example` lists each one, where to create it and which permissions to give.
 Restart the hub after editing `.env`.
 
-**Your data** (projects, tools, notes) is one file: `data/hub.db`. Copy it to
+**Your data** (projects, tools, notes, saved numbers) is one file: `data/hub.db`. Copy it to
 back up the hub.
 
 ## Using it from your phone
@@ -85,7 +118,7 @@ Your computer needs to be on for the phone to reach it.
 | `npm run dev` | Run with live reload while changing the code (page on port 5173). Press Ctrl+C to stop it |
 | `npm test` | Run the plugin tests |
 | `npm run typecheck` | Check the code for type errors |
-| `npm run check-plugins` | Try every plugin tile against the real services and report which ones fail |
+| `npm run check-plugins` | Try every plugin tile (and the numbers it saves for analytics) against the real services and report which ones fail |
 
 ## When a service changes its API
 
@@ -101,6 +134,8 @@ an update**, run `npm run check-plugins` to see which one, then fix that file
   helpers) and `index.ts` (the list of plugins).
 - `web/`: the page, in React. Builder mode uses
   [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout);
-  notes use [Tiptap](https://tiptap.dev).
+  notes use [Tiptap](https://tiptap.dev); charts use [Recharts](https://recharts.org).
+- Saved numbers live in a `metrics` table in `data/hub.db`
+  (`server/metrics.ts`); `server/collector.ts` is the hourly job.
 - `shared/types.ts`: types used by both sides, including the plugin "view"
   format every plugin returns.

@@ -10,6 +10,8 @@ if (existsSync(".env")) process.loadEnvFile(".env");
 const db = await import("./db.ts");
 const { plugins, getPlugin, pluginMeta, runLoad, runAction } = await import("./plugins/index.ts");
 const { linkInfo, favicon, isLocalPath, openLocal } = await import("./links.ts");
+const { analytics, listSeries } = await import("./metrics.ts");
+const { collectAll, lastRun, startCollector } = await import("./collector.ts");
 
 const app = new Hono();
 const api = new Hono();
@@ -86,6 +88,15 @@ api.post("/tools/:id/plugin/actions/:action", async (c) => {
   return c.json(await runAction(p, t.id, t.config, c.req.param("action"), args));
 });
 
+// ---- Analytics
+api.get("/metrics", (c) => c.json({ series: listSeries(), lastRun: lastRun() ?? null }));
+api.post("/metrics/collect", async (c) => c.json(await collectAll()));
+api.get("/tools/:id/analytics", (c) => {
+  const t = db.getTool(c.req.param("id"));
+  if (!t || t.type !== "analytics") return c.json({ ok: false, error: "Analytics tile not found" }, 404);
+  return c.json(analytics(t.config));
+});
+
 // ---- Links
 api.get("/link-info", async (c) => {
   const url = c.req.query("url") ?? "";
@@ -117,8 +128,9 @@ app.route("/api", api);
 app.use("/*", serveStatic({ root: "./web/dist" }));
 app.get("*", serveStatic({ path: "./web/dist/index.html" }));
 
-const port = Number(process.env.PORT) || 8787;
-const hostname = process.env.HOST || "127.0.0.1";
+const port = Number(process.env.HUB_PORT) || 8787;
+const hostname = process.env.HUB_HOST || "127.0.0.1";
 serve({ fetch: app.fetch, port, hostname }, () => {
   console.log(`Management hub running at http://localhost:${port}`);
 });
+startCollector();

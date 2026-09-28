@@ -7,6 +7,7 @@
 // ones fail, so a broken plugin is easy to find.
 
 import type { PluginConfigField, PluginResult, PluginView } from "../../shared/types.ts";
+import type { MetricPoint } from "../../shared/metrics.ts";
 
 export interface PluginContext {
   /** Settings entered in builder mode for this tile. */
@@ -26,6 +27,12 @@ export interface Plugin {
   configFields: PluginConfigField[];
   load(ctx: PluginContext): Promise<PluginView>;
   actions: Record<string, (ctx: PluginContext, args: Record<string, unknown>) => Promise<string>>;
+  /**
+   * Optional: numbers to save for the analytics module. The hub calls this
+   * every hour for each tile of this plugin. Give a limit as a second metric
+   * named `<metric>.limit` and analytics tiles show a gauge by themselves.
+   */
+  collect?(ctx: PluginContext): Promise<MetricPoint[]>;
 }
 
 // ---- Errors that plugins raise, turned into plain-language messages.

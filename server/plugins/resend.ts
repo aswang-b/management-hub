@@ -42,6 +42,22 @@ async function emailsThisMonth(ctx: PluginContext) {
   return { emails, complete: false };
 }
 
+/** Counts used by both the tile and the hourly analytics collection. */
+async function usage(ctx: PluginContext) {
+  const { emails, complete } = await emailsThisMonth(ctx);
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  return {
+    emails,
+    complete,
+    today: emails.filter((e) => new Date(e.created_at) >= dayStart).length,
+    month: emails.length,
+    bounced: emails.filter((e) => ["bounced", "complained"].includes(e.last_event)).length,
+    daily: Number(ctx.config.dailyLimit) || DEFAULT_DAILY,
+    monthly: Number(ctx.config.monthlyLimit) || DEFAULT_MONTHLY,
+  };
+}
+
 function eventTone(e: string | undefined): Tone {
   if (!e) return "neutral";
   if (["delivered", "opened", "clicked"].includes(e)) return "ok";
@@ -66,15 +82,7 @@ export const resend: Plugin = {
   async load(ctx) {
     const domains = await rs(ctx, "/domains");
     expectShape(Array.isArray(domains?.data), "Resend", "domain list");
-    const { emails, complete } = await emailsThisMonth(ctx);
-
-    const dayStart = new Date();
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const today = emails.filter((e) => new Date(e.created_at) >= dayStart).length;
-    const month = emails.length;
-    const bounced = emails.filter((e) => ["bounced", "complained"].includes(e.last_event)).length;
-    const daily = Number(ctx.config.dailyLimit) || DEFAULT_DAILY;
-    const monthly = Number(ctx.config.monthlyLimit) || DEFAULT_MONTHLY;
+    const { emails, complete, today, month, bounced, daily, monthly } = await usage(ctx);
     const usageTone = (used: number, max: number): Tone => (used >= max ? "bad" : used / max > 0.8 ? "warn" : "ok");
     const unverified = domains.data.filter((d: any) => d.status !== "verified");
 
@@ -125,6 +133,18 @@ export const resend: Plugin = {
         { label: "Usage", url: "https://resend.com/settings/usage" },
       ],
     };
+  },
+
+  // Saved every hour for analytics tiles. Counts are for the whole Resend account.
+  async collect(ctx) {
+    const { today, month, bounced, daily, monthly } = await usage(ctx);
+    return [
+      { metric: "resend.emails_today", value: today },
+      { metric: "resend.emails_today.limit", value: daily },
+      { metric: "resend.emails_month", value: month },
+      { metric: "resend.emails_month.limit", value: monthly },
+      { metric: "resend.bounces_month", value: bounced },
+    ];
   },
 
   actions: {

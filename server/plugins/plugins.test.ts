@@ -3,7 +3,7 @@
 // the buttons make. Run with `npm test`.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { runAction, runLoad } from "./index.ts";
+import { runAction, runCollect, runLoad } from "./index.ts";
 import { github } from "./github.ts";
 import { supabase } from "./supabase.ts";
 import { netlify } from "./netlify.ts";
@@ -205,6 +205,46 @@ test("resend: counts this month's emails across pages and flags unverified domai
   assert.equal(stats["Bounced / complaints"], "1");
   assert.equal(r.view!.sections![0].items[1].actions![0].id, "verifyDomain");
   assert.equal(r.view!.actions!.length, 0); // no test addresses configured
+});
+
+test("resend: saves email counts and limits for analytics", async () => {
+  routes = [["GET", /\/emails\?limit=100$/, { has_more: false, data: [
+    { id: "e1", to: ["a"], created_at: now, last_event: "delivered" },
+    { id: "e2", to: ["b"], created_at: now, last_event: "bounced" },
+  ] }]];
+  const r = await runCollect(resend, { monthlyLimit: "50000" });
+  assert.ok(r.ok, r.error ?? "");
+  const got = Object.fromEntries(r.points.map((p) => [p.metric, p.value]));
+  assert.deepEqual(got, {
+    "resend.emails_today": 2,
+    "resend.emails_today.limit": 100,
+    "resend.emails_month": 2,
+    "resend.emails_month.limit": 50000,
+    "resend.bounces_month": 1,
+  });
+});
+
+test("netlify: saves bandwidth and the plan's allowance, tagged by team", async () => {
+  routes = [
+    ["GET", /\/sites\/my\.netlify\.app$/, { id: "s1", name: "my", account_slug: "team" }],
+    ["GET", /\/accounts\/team\/bandwidth$/, { used: 90e9, included: 100e9 }],
+  ];
+  const r = await runCollect(netlify, { site: "my.netlify.app" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.deepEqual(r.points, [
+    { metric: "netlify.bandwidth_bytes", value: 90e9, tags: { account: "team" } },
+    { metric: "netlify.bandwidth_bytes.limit", value: 100e9, tags: { account: "team" } },
+  ]);
+});
+
+test("netlify: a changed bandwidth response is reported, not saved", async () => {
+  routes = [
+    ["GET", /\/sites\/my\.netlify\.app$/, { id: "s1", name: "my", account_slug: "team" }],
+    ["GET", /\/accounts\/team\/bandwidth$/, { credits: 5 }],
+  ];
+  const r = await runCollect(netlify, { site: "my.netlify.app" });
+  assert.equal(r.ok, false);
+  assert.match(r.error!, /needs an update/);
 });
 
 // ---- Google and status (no tokens)

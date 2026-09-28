@@ -203,6 +203,47 @@ a.item-title:hover { text-decoration: underline; }
 }
 .toast.bad { background: var(--paper); color: var(--ink); border-style: double; border-width: 4px; }
 
+/* ---- Analytics module */
+.analytics { container-type: size; display: flex; flex-direction: column; height: 100%; }
+.an-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.an-title { font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-range { font-size: 11px; color: var(--mid); white-space: nowrap; }
+.an-msg { padding: 8px 10px; font-size: 12px; overflow: hidden; }
+.an-figures { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.an-value { font-family: var(--mono); font-weight: 700; line-height: 1.05; white-space: nowrap; }
+.an-of { font-family: var(--mono); color: var(--mid); font-size: 13px; }
+.an-change { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.an-gauge { font-size: 11px; }
+.an-gauge .meter { margin: 0 0 2px; }
+.an-spark { flex: 1; min-height: 0; width: 100%; fill: none; stroke: currentColor; }
+.an-spark polyline { stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.an-spark circle { fill: currentColor; stroke: none; }
+.an-nochart { font-size: 11px; }
+.an-chart { flex: 1; min-height: 0; margin: 4px 0 0 -4px; }
+.an-chart .recharts-surface { overflow: visible; }
+
+/* One row tall: compact number (+ sparkline when wider) */
+.an-small { padding: 6px 8px; gap: 2px; }
+.an-small .an-value { font-size: clamp(16px, 30cqh, 34px); }
+.an-narrow .an-value { font-size: clamp(14px, min(30cqh, 20cqw), 34px); }
+.an-narrow .an-msg { padding: 0; font-size: 11px; }
+/* Two rows or more: header bar like plugin tiles, then a full chart */
+.an-large .an-head { padding: 4px 4px 4px 10px; border-bottom: var(--line); min-height: 34px; }
+.an-large .an-figures, .an-large .an-gauge { padding: 8px 10px 0; }
+.an-large .an-value { font-size: 26px; }
+.an-large .an-chart { padding: 0 6px 6px 0; }
+/* Over the limit: inverted, like other "bad" states */
+.an-bad { background: var(--ink); color: var(--paper); }
+.an-bad .an-range, .an-bad .an-of, .an-bad .muted { color: #bbb; }
+.an-bad.an-large .an-head { border-bottom-color: var(--paper); }
+.an-bad .icon-btn:hover:not(:disabled) { background: var(--paper); color: var(--ink); }
+
+/* ---- Settings extras (e.g. "Collect now") */
+.settings-extra { border: var(--thin); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-size: 12px; }
+.settings-extra small { color: var(--ink); font-size: 12px; }
+.field select { border: var(--thin); padding: 7px 8px; background: var(--paper); outline: none; font: inherit; }
+.field select:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+
 .tone { font-size: 10px; width: 12px; display: inline-block; text-align: center; flex-shrink: 0; }
 .tone-pending { animation: blink 1.4s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }

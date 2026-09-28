@@ -96,9 +96,13 @@ export function Workspace({ project, registry, building }: { project: Project; r
         config.url = `https://${config.url}`;
       }
     }
-    const updated = await api.updateTool(tool.id, { config, data });
-    setTools((ts) => ts.map((t) => (t.id === tool.id ? updated : t)));
-    setEditing(undefined);
+    try {
+      const updated = await api.updateTool(tool.id, { config, data });
+      setTools((ts) => ts.map((t) => (t.id === tool.id ? updated : t)));
+      setEditing(undefined);
+    } catch (e) {
+      alert(`Couldn't save the settings: ${(e as Error).message}`);
+    }
   }
 
   const saveData = useCallback((id: string, data: Tool["data"]) => {
@@ -177,7 +181,7 @@ export function Workspace({ project, registry, building }: { project: Project; r
                   className={`phone-item phone-${t.category}`}
                   style={{
                     gridColumn: `span ${t.category === "link" ? Math.min(t.w, PHONE_COLS) : PHONE_COLS}`,
-                    height: t.category === "link" ? 64 : Math.max(240, t.h * 120),
+                    height: t.category === "link" ? 64 : t.h === 1 ? 120 : Math.max(240, t.h * 120),
                   }}
                 >
                   {tile(t)}
