@@ -11,6 +11,10 @@ module (generic analytics, not built yet), the stack choice, phone access and
 similar tools. Read it before adding features. Its **Built?** notes list
 known gaps; update them when something from it is built.
 
+More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
+`docs/ai-context/docs-overview.md` (which doc answers what), and a
+`CONTEXT.md` in `server/`, `server/plugins/` and `web/src/`.
+
 ## Layout
 - `server/index.ts`: Hono API routes + serves `web/dist`. Loads `.env` itself.
   API middleware refuses unknown hosts (allowed: localhost, `*.ts.net`,
