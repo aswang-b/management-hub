@@ -2,7 +2,12 @@
 
 A dashboard that runs on your own computer and puts the upkeep of your
 other projects (GitHub, Supabase, Netlify, Cloudflare, Resend, Google Cloud)
-in one place, so you don't need a dozen tabs and logins.
+in one place, so you don't need a dozen tabs and logins. It covers the three
+reasons to visit those sites: taking maintenance actions, checking analytics,
+and staying under billing limits.
+
+The original request, what's built so far and what's planned are in
+[docs/project-brief.md](docs/project-brief.md).
 
 ![Hub with the bachata-website project](docs/screenshot.png)
 
@@ -15,6 +20,9 @@ in one place, so you don't need a dozen tabs and logins.
   grid (or click a size to drop it in the first free spot), drag tools around,
   change their size (⇲), edit their settings (⚙) or remove them (✕). Press
   **Done** when finished. Everything saves automatically.
+
+  ![Builder mode](docs/builder-mode.png)
+
 - **Tools** come in three kinds:
   - **Links** (1, 2 or 3 squares wide) open a website or a file on your
     computer. They show the site's icon, and its name when wider than one square.
@@ -73,6 +81,7 @@ Your computer needs to be on for the phone to reach it.
 | Command | What it does |
 |---|---|
 | `npm start` | Build the page and run the hub |
+| `npm run serve` | Run the hub without rebuilding the page (faster, if nothing changed) |
 | `npm run dev` | Run with live reload while changing the code (page on port 5173) |
 | `npm test` | Run the plugin tests |
 | `npm run typecheck` | Check the code for type errors |
