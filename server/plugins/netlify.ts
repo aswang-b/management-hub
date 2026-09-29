@@ -43,7 +43,31 @@ interface Credits {
   resets?: string;
   exceeded: boolean;
   /** How `used` was worked out (see `credits`). */
-  estimate: { deploys: number; deployCredits: number; bandwidthBytes: number; bandwidthCredits: number };
+  estimate: {
+    deploys: number;
+    deployCredits: number;
+    bandwidthBytes: number;
+    bandwidthCredits: number;
+    manual: { label: string; credits?: number; at?: string; stale: boolean }[];
+  };
+}
+
+// Credits the API doesn't report; typed in by hand in the tile's settings.
+const MANUAL = [
+  { key: "computeCredits", label: "Compute" },
+  { key: "requestCredits", label: "Web requests" },
+];
+
+/** The hand-entered numbers, and whether each belongs to the current period. */
+function manualCredits(ctx: PluginContext, since: Date) {
+  return MANUAL.map((m) => {
+    const credits = Number(ctx.config[m.key]);
+    const at = ctx.config[`${m.key}At`];
+    const known = ctx.config[m.key] !== undefined && Number.isFinite(credits);
+    // A number typed before this period started is last period's usage.
+    const stale = known && Boolean(at) && new Date(at).getTime() < since.getTime();
+    return { label: m.label, credits: known ? credits : undefined, at, stale };
+  });
 }
 
 const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v && typeof v === "object" ? Object.keys(v).length > 0 : Boolean(v));
@@ -90,10 +114,12 @@ async function credits(ctx: PluginContext, slug: string | undefined, bandwidthUs
     deployCredits: deploys * CREDIT_COSTS.deploy,
     bandwidthBytes,
     bandwidthCredits: (bandwidthBytes / 1e9) * CREDIT_COSTS.perBandwidthGb,
+    manual: manualCredits(ctx, since),
   };
+  const manualTotal = estimate.manual.reduce((sum, m) => sum + (m.stale ? 0 : (m.credits ?? 0)), 0);
   const reported = Number(account.capabilities.credits.used) || 0;
   // If Netlify starts reporting real usage, it will be at least our estimate.
-  const used = Math.round(Math.max(reported, estimate.deployCredits + estimate.bandwidthCredits));
+  const used = Math.round(Math.max(reported, estimate.deployCredits + estimate.bandwidthCredits + manualTotal));
   return {
     included,
     used,
@@ -136,7 +162,17 @@ export const netlify: Plugin = {
       ],
     },
   ],
-  configFields: [{ key: "site", label: "Site", placeholder: "mysite.netlify.app", required: true }],
+  configFields: [
+    { key: "site", label: "Site", placeholder: "mysite.netlify.app", required: true },
+    ...MANUAL.map((m) => ({
+      key: m.key,
+      label: `${m.label} credits used (optional)`,
+      type: "number" as const,
+      timestamped: true,
+      placeholder: "e.g. 21",
+      help: `Netlify's API doesn't report ${m.label.toLowerCase()}. Copy it from Usage & billing > Credit usage breakdown, and update it now and then.`,
+    })),
+  ],
 
   async load(ctx) {
     const s = await nf(ctx, `/sites/${encodeURIComponent(site(ctx))}`);
@@ -187,11 +223,25 @@ export const netlify: Plugin = {
       items: [
         { title: `${num(e.deploys)} production deploys: ${num(e.deployCredits)} credits`, subtitle: `All sites in the team, ${CREDIT_COSTS.deploy} credits each` },
         { title: `${bytes(e.bandwidthBytes)} bandwidth: ${num(Math.round(e.bandwidthCredits))} credits`, subtitle: `${CREDIT_COSTS.perBandwidthGb} credits per GB` },
-        {
-          title: "Web requests and compute: not included",
-          subtitle: "Netlify's API doesn't report these, so the real total can be a bit higher. The Usage link shows the exact number.",
-          url: `https://app.netlify.com/teams/${s.account_slug}/billing/usage`,
-        },
+        ...e.manual.map((m) =>
+          m.credits === undefined
+            ? {
+                title: `${m.label}: not included`,
+                subtitle: "Netlify's API doesn't report this. Type it into this tile's settings (from Netlify's Usage page) to include it.",
+                url: `https://app.netlify.com/teams/${s.account_slug}/billing/usage`,
+              }
+            : m.stale
+              ? {
+                  title: `${m.label}: not included (last period's number)`,
+                  subtitle: `You entered ${num(m.credits)} ${ago(m.at)}, before this period started. Update it in this tile's settings.`,
+                  tone: "warn" as Tone,
+                  url: `https://app.netlify.com/teams/${s.account_slug}/billing/usage`,
+                }
+              : {
+                  title: `${m.label}: ${num(m.credits)} credits`,
+                  subtitle: `Entered by you${m.at ? ` ${ago(m.at)}` : ""}; update it in this tile's settings`,
+                },
+        ),
       ],
     };
     const left = credit && creditEquivalents(credit.remaining);

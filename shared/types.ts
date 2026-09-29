@@ -78,6 +78,8 @@ export interface PluginConfigField {
   help?: string;
   required?: boolean;
   type?: "text" | "number" | "select";
+  /** Record when the value was last changed, in `config[key + "At"]` (for numbers typed in by hand). */
+  timestamped?: boolean;
   /** Choices for a "select" field. */
   options?: { value: string; label: string }[];
 }

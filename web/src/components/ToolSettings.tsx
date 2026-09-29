@@ -50,7 +50,19 @@ export function ToolSettings({
     const set = (v: string) => setValues({ ...values, [f.key]: v });
     if (f.type !== "select") {
       return (
-        <input type={f.type === "number" ? "number" : "text"} value={value} placeholder={f.placeholder} required={f.required} onChange={(e) => set(e.target.value)} />
+        <>
+          <input
+            type={f.type === "number" ? "number" : "text"}
+            step={f.type === "number" ? "any" : undefined}
+            value={value}
+            placeholder={f.placeholder}
+            required={f.required}
+            onChange={(e) => set(e.target.value)}
+          />
+          {f.timestamped && typeof tool.config[`${f.key}At`] === "string" && (
+            <small>Last updated {new Date(String(tool.config[`${f.key}At`])).toLocaleString()}</small>
+          )}
+        </>
       );
     }
     const options = extra.options?.[f.key] ?? f.options ?? [];
@@ -76,6 +88,13 @@ export function ToolSettings({
           for (const f of def.configFields) {
             const v = values[f.key]?.trim();
             if (v) config[f.key] = f.type === "number" ? Number(v) : v;
+            // Timestamped fields remember when they were last changed.
+            if (f.timestamped) {
+              const at = `${f.key}At`;
+              if (config[f.key] !== tool.config[f.key]) {
+                if (config[f.key] !== undefined) config[at] = new Date().toISOString();
+              } else if (tool.config[at]) config[at] = tool.config[at];
+            }
           }
           onSave(config);
         }}

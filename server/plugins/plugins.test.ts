@@ -292,6 +292,24 @@ test("netlify: estimates credits used from deploys and bandwidth, since Netlify 
   assert.equal(r.view!.notice, undefined);
 });
 
+test("netlify: adds compute and web-request credits typed in by hand", async () => {
+  routes = creditRoutes({ deploys: fourteenDeploys, bandwidth: 153406447 });
+  const config = { site: "my.netlify.app", computeCredits: 21, computeCreditsAt: inDays(-1), requestCredits: 5.7, requestCreditsAt: inDays(0) };
+  let r = await runLoad(netlify, id(), config);
+  // 210 deploys + 3 bandwidth + 21 compute + 5.7 requests = 239.8
+  assert.equal(r.view!.stats!.find((s) => s.label.startsWith("Credits used"))!.value, "~240 / 300");
+  const spent = r.view!.sections![1].items.map((i) => i.title);
+  assert.deepEqual(spent.slice(2), ["Compute: 21 credits", "Web requests: 5.7 credits"]);
+
+  // A number entered before this period started is last period's usage: left out, with a warning.
+  routes = creditRoutes({ deploys: fourteenDeploys, bandwidth: 153406447 });
+  r = await runLoad(netlify, id(), { ...config, computeCreditsAt: inDays(-25) });
+  assert.equal(r.view!.stats!.find((s) => s.label.startsWith("Credits used"))!.value, "~219 / 300");
+  const stale = r.view!.sections![1].items[2];
+  assert.match(stale.title, /last period's number/);
+  assert.equal(stale.tone, "warn");
+});
+
 test("netlify: uses Netlify's own figure if it ever reports more than the estimate", async () => {
   routes = creditRoutes({ deploys: [deploy(1)], used: 120 });
   const r = await runLoad(netlify, id(), { site: "my.netlify.app" });
