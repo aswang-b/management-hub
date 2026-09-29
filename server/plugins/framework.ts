@@ -65,6 +65,8 @@ export interface RequestOptions {
   tokenKey?: string;
   /** Status codes that should return null instead of throwing. */
   allow?: number[];
+  /** Return the response body as text instead of parsing it as JSON (e.g. JSON Lines). */
+  text?: boolean;
 }
 
 export async function request<T = any>(url: string, opts: RequestOptions): Promise<T> {
@@ -111,6 +113,7 @@ export async function request<T = any>(url: string, opts: RequestOptions): Promi
     throw new PluginError("other", `${opts.service} returned an error (${res.status}). ${detail}`.trim());
   }
 
+  if (opts.text) return text as T;
   if (text && json === undefined) {
     throw new PluginError("changed", `${opts.service} sent back something that isn't JSON. This plugin may need an update.`);
   }

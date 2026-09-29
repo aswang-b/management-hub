@@ -3,7 +3,7 @@
 One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 
 ## Current plugins
-`github`, `supabase`, `netlify`, `cloudflare`, `resend`, `google`, `status`
+`github`, `supabase`, `netlify`, `vercel`, `cloudflare`, `resend`, `google`, `status`
 (registered in `index.ts`, in that order).
 
 ## The Plugin shape (`framework.ts`)
@@ -15,13 +15,15 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 - `actions`: named functions for buttons; return a short message
 - `collect(ctx)` (optional): numbers to save hourly for analytics, as
   `{ metric, value, tags? }`. Add a `<metric>.limit` point for a gauge.
-  Used by `resend` and `netlify` (credits, or bandwidth on older plans).
+  Used by `resend`, `netlify` (credits, or bandwidth on older plans) and
+  `vercel` (deploys in 24h; billed this month on Pro).
 
 ## Helpers
 - `request(url, opts)`: HTTP with errors turned into plain-language messages.
 - `expectShape(ok, service, what)`: call on the main response so API changes
   show "Plugin needs an update" instead of crashing.
 - `optional(promise)`: for non-essential calls; failure returns `undefined`.
+- `request(url, { text: true })` returns the raw body (e.g. JSON Lines).
 - `PluginError(kind, message)`: kinds: `setup`, `auth`, `not-found`, `changed`, `network`, `other`.
 - `ago`, `bytes`, `num`: formatting.
 

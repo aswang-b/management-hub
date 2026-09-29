@@ -11,6 +11,7 @@ import { cloudflare } from "./cloudflare.ts";
 import { resend } from "./resend.ts";
 import { google } from "./google.ts";
 import { status } from "./status.ts";
+import { vercel } from "./vercel.ts";
 
 type Route = [method: string, pattern: RegExp, body: unknown, status?: number];
 let routes: Route[] = [];
@@ -27,6 +28,7 @@ beforeEach(() => {
   process.env.NETLIFY_TOKEN = "nf-test";
   process.env.CLOUDFLARE_API_TOKEN = "cf-test";
   process.env.RESEND_API_KEY = "rs-test";
+  process.env.VERCEL_TOKEN = "vc-test";
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
@@ -34,7 +36,8 @@ beforeEach(() => {
     calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers.Authorization });
     const r = routes.find(([m, p]) => m === method && p.test(url));
     if (!r) return new Response(JSON.stringify({ message: "no fake route" }), { status: 404 });
-    return new Response(r[2] === null ? null : JSON.stringify(r[2]), { status: r[3] ?? 200 });
+    // A string body is sent as-is (e.g. JSON Lines); anything else as JSON.
+    return new Response(r[2] === null ? null : typeof r[2] === "string" ? r[2] : JSON.stringify(r[2]), { status: r[3] ?? 200 });
   }) as typeof fetch;
 });
 afterEach(() => {
@@ -364,6 +367,121 @@ test("netlify: a changed bandwidth response is reported, not saved", async () =>
   const r = await runCollect(netlify, { site: "my.netlify.app" });
   assert.equal(r.ok, false);
   assert.match(r.error!, /needs an update/);
+});
+
+// ---- Vercel
+const vDeploy = (uid: string, o: { target?: string | null; state?: string; msg?: string; hoursAgo?: number } = {}) => ({
+  uid,
+  url: `${uid}.vercel.app`,
+  inspectorUrl: `https://vercel.com/alex/my-site/${uid}`,
+  target: o.target === undefined ? "production" : o.target,
+  readyState: o.state ?? "READY",
+  created: Date.now() - (o.hoursAgo ?? 1) * 3600_000,
+  meta: { githubCommitMessage: o.msg ?? `Commit ${uid}\ndetails`, githubCommitRef: "main" },
+});
+const charges = [
+  { ChargeCategory: "Usage", ServiceName: "Fast Data Transfer", ConsumedQuantity: 12.5, ConsumedUnit: "GB", BilledCost: 0 },
+  { ChargeCategory: "Usage", ServiceName: "Fast Data Transfer", ConsumedQuantity: 2.5, ConsumedUnit: "GB", BilledCost: 0 },
+  { ChargeCategory: "Usage", ServiceName: "Function Invocations", ConsumedQuantity: 250000, ConsumedUnit: "invocations", BilledCost: 1.5 },
+  { ChargeCategory: "Credit", ServiceName: "Pro credit", ConsumedQuantity: null, ConsumedUnit: null, BilledCost: -1.5 },
+].map((r) => JSON.stringify(r)).join("\n");
+const vercelRoutes = (o: { paused?: boolean; extra?: Route[]; billing?: unknown; billingStatus?: number } = {}): Route[] => [
+  ...(o.extra ?? []),
+  ["GET", /\/v2\/user$/, { user: { defaultTeamId: "team_1" } }],
+  ["GET", /\/v9\/projects\/my-site\?teamId=team_1$/, {
+    id: "prj_1", name: "my-site", paused: o.paused ?? false, link: { productionBranch: "main" },
+    targets: { production: { id: "live", url: "live.vercel.app", alias: ["site.com"], createdAt: Date.now() - 3600_000 } },
+  }],
+  ["GET", /\/v7\/deployments\?projectId=prj_1&limit=8&teamId=team_1$/, { deployments: [
+    vDeploy("new", { state: "BUILDING", msg: "Add page" }),
+    vDeploy("live"),
+    vDeploy("old", { hoursAgo: 30 }),
+    vDeploy("pr", { target: null }),
+  ], pagination: {} }],
+  ["GET", /\/v7\/deployments\?limit=100&since=\d+&teamId=team_1$/, { deployments: [vDeploy("a"), vDeploy("b"), vDeploy("c")], pagination: {} }],
+  ["GET", /\/v9\/projects\/prj_1\/domains\?teamId=team_1$/, { domains: [{ name: "site.com", verified: true }, { name: "www.site.com", verified: false }] }],
+  ["GET", /\/v1\/billing\/charges\?/, o.billing ?? charges, o.billingStatus ?? 200],
+];
+
+test("vercel: status, deploys with actions, deploy limit, usage and domains", async () => {
+  routes = vercelRoutes();
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.equal(r.view!.status!.label, "Deploying (building)"); // the newest production deploy is still building
+  const stats = Object.fromEntries(r.view!.stats!.map((s) => [s.label, s]));
+  assert.equal(stats["Deploys (24h)"].value, "3 / 100");
+  assert.equal(stats["Billed this month"].value, "$0.00"); // usage offset by the plan's credit
+  const [deploys, usage, domains] = r.view!.sections!;
+  assert.equal(deploys.items[0].title, "Add page");
+  assert.equal(deploys.items[0].actions![0].id, "cancel");
+  assert.match(deploys.items[1].title, /^LIVE · Commit live/);
+  assert.equal(deploys.items[1].actions!.length, 0);
+  assert.equal(deploys.items[2].actions![0].id, "rollback");
+  assert.ok(deploys.items[2].actions![0].confirm);
+  assert.equal(deploys.items[3].actions!.length, 0); // previews aren't rollback targets
+  assert.deepEqual(usage.items.map((i) => i.title), ["Function Invocations: 250,000 invocations", "Fast Data Transfer: 15 GB"]);
+  assert.equal(domains.items[1].actions![0].id, "verifyDomain");
+  assert.deepEqual(r.view!.actions!.map((a) => a.id), ["redeploy"]);
+  assert.equal(r.view!.links!.find((l) => l.label === "Usage")!.url, "https://vercel.com/alex/~/usage");
+});
+
+test("vercel: says plainly when usage isn't available on the plan", async () => {
+  routes = vercelRoutes({ billing: { error: { message: "Only available for Pro and Enterprise teams" } }, billingStatus: 403 });
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.equal(r.view!.stats!.find((s) => s.label === "Billed this month"), undefined);
+  assert.match(r.view!.sections![1].items[0].title, /Not available through Vercel's API/);
+});
+
+test("vercel: a paused project offers Resume, and the deploy limit warns", async () => {
+  routes = vercelRoutes({ paused: true });
+  const r = await runLoad(vercel, id(), { project: "my-site", deploysPerDay: 3 });
+  assert.equal(r.view!.status!.label, "Project paused");
+  assert.match(r.view!.notice!, /paused this project/);
+  assert.match(r.view!.notice!, /daily deploy limit is used up/);
+  assert.equal(r.view!.actions![0].id, "unpause");
+  assert.ok(r.view!.actions![0].confirm);
+  assert.equal(r.view!.stats!.find((s) => s.label === "Deploys (24h)")!.tone, "bad");
+});
+
+test("vercel: uses the team from settings instead of the default", async () => {
+  routes = vercelRoutes({ extra: [["GET", /\/v9\/projects\/my-site\?slug=acme$/, { id: "prj_9", name: "my-site", targets: {} }], ["GET", /\?.*slug=acme/, { deployments: [], domains: [] }]] });
+  const r = await runLoad(vercel, id(), { project: "my-site", team: "acme" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.ok(!calls.some((c) => c.url.includes("/v2/user")));
+  assert.ok(calls.every((c) => c.url.includes("slug=acme")));
+});
+
+test("vercel: buttons call the right endpoints", async () => {
+  routes = vercelRoutes({ extra: [["POST", /./, {}], ["PATCH", /./, {}]] });
+  const cfg = { project: "my-site" };
+  assert.ok((await runAction(vercel, id(), cfg, "redeploy", { deploymentId: "live" })).ok);
+  let c = calls.at(-1)!;
+  assert.match(c.url, /\/v13\/deployments\?forceNew=1&teamId=team_1$/);
+  assert.deepEqual(c.body, { name: "my-site", project: "prj_1", deploymentId: "live", target: "production" });
+  assert.equal(c.auth, "Bearer vc-test");
+  assert.ok((await runAction(vercel, id(), cfg, "rollback", { deploymentId: "old" })).ok);
+  assert.match(calls.at(-1)!.url, /\/v1\/projects\/prj_1\/rollback\/old\?teamId=team_1$/);
+  assert.ok((await runAction(vercel, id(), cfg, "cancel", { deploymentId: "new" })).ok);
+  c = calls.at(-1)!;
+  assert.equal(c.method, "PATCH");
+  assert.match(c.url, /\/v12\/deployments\/new\/cancel\?teamId=team_1$/);
+  assert.ok((await runAction(vercel, id(), cfg, "unpause", {})).ok);
+  assert.match(calls.at(-1)!.url, /\/v1\/projects\/prj_1\/unpause\?teamId=team_1$/);
+  assert.ok((await runAction(vercel, id(), cfg, "verifyDomain", { domain: "www.site.com" })).ok);
+  assert.match(calls.at(-1)!.url, /\/v9\/projects\/prj_1\/domains\/www\.site\.com\/verify\?teamId=team_1$/);
+});
+
+test("vercel: saves deploys and charges for analytics", async () => {
+  routes = vercelRoutes();
+  const r = await runCollect(vercel, { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  const tags = { team: "team_1" };
+  assert.deepEqual(r.points, [
+    { metric: "vercel.deploys_24h", value: 3, tags },
+    { metric: "vercel.deploys_24h.limit", value: 100, tags },
+    { metric: "vercel.billed_usd_month", value: 0, tags },
+  ]);
 });
 
 // ---- Google and status (no tokens)

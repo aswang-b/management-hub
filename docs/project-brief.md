@@ -76,6 +76,7 @@ only in `.env` on your computer, never in the browser or in git.
 | **Resend** | Domains (status, re-verify), API keys, contacts, broadcasts, sent emails | Status of each email (delivered, bounced, opened) | No single quota endpoint. Count sent emails per day and month against the limit | API key |
 | **Cloudflare** | DNS records, cache purge, Pages deploys, SSL status, firewall rules | Requests, bandwidth, threats, page views (GraphQL Analytics API) | Free plan mostly not billed; Workers/Pages usage via GraphQL | Scoped API token |
 | **Netlify** | Deploys: retry, roll back, lock, build hooks, env variables, form submissions | Netlify Analytics is a paid add-on | Allowance and period on the account (undocumented `capabilities.credits`, whose `used` stays 0); credits used must be estimated from production deploys and `/accounts/{slug}/bandwidth`. No API reports web-request or compute credits (checked 2026-09-28) | Personal access token |
+| **Vercel** | Deploys: redeploy, instant rollback, cancel, pause/unpause, domain verify, env variables | Deployment list; runtime logs | `/v1/billing/charges` (FOCUS JSON Lines) for Pro and Enterprise only; Hobby usage isn't available through the API | Access token scoped to a team |
 
 What this means for the design:
 
@@ -96,7 +97,12 @@ pinned, shape checks, `check-plugins`, confirmations, and the status-page
 plugin. Google is a plugin tile of open incidents plus shortcut links, since
 Google has no API for those pages. **Not yet:** GitHub traffic and billing
 numbers, Supabase last-activity and pause warning, Cloudflare DNS and Pages
-deploys, Netlify deploy locking and build hooks.
+deploys, Netlify deploy locking and build hooks. **Added since:** a Vercel
+plugin (the site is moving from Netlify to Vercel): production status and
+paused state, deploys, deploys per 24 hours vs. the Hobby limit of 100,
+monthly charges on Pro, domains; redeploy, rollback, cancel, resume, verify.
+Hobby usage (data transfer, invocations, CPU) can only be read in Vercel's
+dashboard.
 
 ---
 

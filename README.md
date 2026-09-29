@@ -1,7 +1,7 @@
 # Management Hub
 
 A dashboard that runs on your own computer and puts the upkeep of your
-other projects (GitHub, Supabase, Netlify, Cloudflare, Resend, Google Cloud)
+other projects (GitHub, Supabase, Netlify, Vercel, Cloudflare, Resend, Google Cloud)
 in one place, so you don't need a dozen tabs and logins. It covers the three
 reasons to visit those sites: taking maintenance actions, checking analytics,
 and staying under billing limits.
@@ -46,6 +46,7 @@ The original request, what's built so far and what's planned are in
 | GitHub | Latest workflow runs, open PRs and issues, security alerts | Re-run (failed) workflows, run a workflow by hand |
 | Supabase | Project status (paused?), service health, database size vs. limit, last backup | Restore a paused project, pause |
 | Netlify | Recent deploys; credits used and left (an estimate from production deploys and bandwidth, since Netlify's API doesn't report web requests or compute), when they reset, and what the rest is worth in deploys, web requests, compute or bandwidth (older plans: bandwidth vs. plan) | Rebuild, clear cache & rebuild, retry a failed deploy, roll back to an older deploy |
+| Vercel | Production status (and whether Vercel paused the project), recent deploys, deploys in the last 24 hours vs. the daily limit (100 on Hobby), this month's usage and charges (Pro and Enterprise only: Vercel doesn't share Hobby usage through its API), domain verification | Redeploy production, roll back to an older deploy, cancel a building deploy, resume a paused project, verify a domain |
 | Cloudflare | Zone status, SSL mode, DNS count, 7-day requests, visitors, bandwidth, cache rate, threats | Purge cache, toggle development mode |
 | Resend | Domain verification, recent emails, emails sent today and this month vs. limits, bounces | Re-verify a domain, send a test email |
 | Google Cloud | Open Google Cloud incidents | Shortcuts to the sign-in Audience, OAuth clients, branding, billing and quotas pages (Google has no API for these) |
@@ -62,6 +63,7 @@ your projects:
 |---|---|
 | Resend | Emails sent today and this month (with your daily and monthly limits), bounces this month |
 | Netlify | Credits used (estimated, with your plan's allowance), credits left, bandwidth used |
+| Vercel | Deploys in the last 24 hours (with the daily limit); on Pro, the amount billed this month |
 
 An **Analytics** tile (under Modules in builder mode) charts one of these
 numbers. Its settings (⚙) pick the number, the time range (24 hours to 90
