@@ -121,7 +121,7 @@ test("supabase: active project shows DB size against the limit", async () => {
   routes = [
     ["GET", /\/projects\/abc$/, { status: "ACTIVE_HEALTHY", region: "us-east-1" }],
     ["GET", /\/health\?/, [{ name: "db", healthy: true, status: "ACTIVE_HEALTHY" }]],
-    ["POST", /\/database\/query$/, [{ bytes: 450e6 }]],
+    ["POST", /\/database\/query\/read-only$/, [{ bytes: 450e6 }]],
     ["GET", /\/backups$/, { backups: [{ inserted_at: now, status: "COMPLETED" }] }],
   ];
   const r = await runLoad(supabase, id(), { projectRef: "abc" });
@@ -132,6 +132,22 @@ test("supabase: active project shows DB size against the limit", async () => {
   routes = [["POST", /.*/, {}]];
   assert.ok((await runAction(supabase, id(), { projectRef: "abc" }, "restore", {})).ok);
   assert.match(calls.at(-1)!.url, /\/v1\/projects\/abc\/restore$/);
+});
+
+test("supabase: reads the database size with a read-only query (scoped tokens need only Database: Read)", async () => {
+  routes = [
+    ["GET", /\/projects\/abc$/, { status: "ACTIVE_HEALTHY", region: "us-east-1" }],
+    ["GET", /\/health\?/, []],
+    // Some responses wrap the rows in an object.
+    ["POST", /\/database\/query\/read-only$/, { result: [{ bytes: 100e6 }] }],
+    ["GET", /\/backups$/, { backups: [] }],
+  ];
+  const r = await runLoad(supabase, id(), { projectRef: "abc" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.match(r.view!.stats!.find((s) => s.label === "Database size")!.value, /^100 MB/);
+  const query = calls.find((c) => c.method === "POST")!;
+  assert.match(query.url, /\/database\/query\/read-only$/);
+  assert.match(query.body.query, /pg_catalog\.pg_database_size/);
 });
 
 // ---- Netlify

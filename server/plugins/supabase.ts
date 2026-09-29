@@ -44,12 +44,15 @@ export const supabase: Plugin = {
   env: [
     {
       key: "SUPABASE_ACCESS_TOKEN",
-      help: "A personal access token for Supabase's Management API.",
+      help: "A scoped personal access token, limited to the projects you show in the hub.",
       url: "https://supabase.com/dashboard/account/tokens",
       steps: [
-        "Open the Access Tokens page in your Supabase account settings.",
-        "Press \"Generate new token\" and name it \"Management hub\".",
-        "Copy the token (it starts with sbp_) and paste it below. Supabase shows it only once.",
+        "Open the Access Tokens page in your Supabase account settings and start a new token.",
+        "Make it a scoped token, not a classic one: a classic token can do everything on every project you have.",
+        "Name it \"Management hub\" and pick an expiration date.",
+        "Choose your organization, then only the project(s) you'll add to the hub.",
+        "Give it these permissions and leave the rest without access: Project Settings: Read and write (Read is enough if you don't need the Restore and Pause buttons), Database: Read (for the database size), Backups: Read (for the last backup).",
+        "Create the token, copy it (it starts with sbp_) and paste it below. Supabase shows it only once.",
       ],
     },
   ],
@@ -68,18 +71,20 @@ export const supabase: Plugin = {
 
     const [health, size, backups] = await Promise.all([
       active ? optional(sb<any[]>(ctx, `/projects/${r}/health?services=auth&services=db&services=rest&services=storage&services=realtime`)) : undefined,
+      // The read-only query endpoint only needs the token's "Database: Read" permission.
       active
         ? optional(
-            sb<any[]>(ctx, `/projects/${r}/database/query`, {
+            sb<any>(ctx, `/projects/${r}/database/query/read-only`, {
               method: "POST",
-              body: { query: "select pg_database_size(current_database())::bigint as bytes" },
+              body: { query: "select pg_catalog.pg_database_size(pg_catalog.current_database())::bigint as bytes" },
             }),
           )
         : undefined,
       optional(sb(ctx, `/projects/${r}/database/backups`)),
     ]);
 
-    const dbBytes = Number(size?.[0]?.bytes);
+    const rows = Array.isArray(size) ? size : (size?.result ?? size?.rows);
+    const dbBytes = Number(rows?.[0]?.bytes);
     const lastBackup = backups?.backups?.[0];
 
     return {
