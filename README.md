@@ -35,7 +35,8 @@ The original request, what's built so far and what's planned are in
   - **Links** (1, 2 or 3 squares wide) open a website or a file on your
     computer. They show the site's icon, and its name when wider than one square.
   - **Modules** are built into the hub: **Notes**, rich text with lists,
-    numbering, highlights and text colors, and **Analytics**, charts of
+    numbering, highlights and text colors (give a notes tile a label in its
+    settings ⚙ to show a heading), and **Analytics**, charts of
     numbers the hub saves every hour (see [Analytics](#analytics)).
   - **Plugins** show live information from a service and let you take its most
     common maintenance actions without opening the service's website:

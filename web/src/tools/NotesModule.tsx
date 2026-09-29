@@ -37,9 +37,15 @@ export function NotesModule({ tool, onData }: { tool: Tool; onData: (data: Tool[
 
   if (!editor) return null;
   const chain = () => editor.chain().focus();
+  const label = String(tool.config.label ?? "").trim();
 
   return (
     <div className="notes">
+      {label && (
+        <div className="notes-label" title={label}>
+          {label}
+        </div>
+      )}
       <div className="notes-toolbar" onMouseDown={(e) => e.preventDefault()}>
         <button className={state?.bold ? "on" : ""} onClick={() => chain().toggleBold().run()} title="Bold">
           <b>B</b>

@@ -28,6 +28,7 @@ The React page. Built by Vite into `web/dist`, which the server serves.
   added automatically from the server's plugin list (`buildRegistry`).
 - `tools/LinkTool.tsx`: a link or local file with favicon.
 - `tools/NotesModule.tsx`: rich-text notes (TipTap), saved to the tile's `data`.
+  An optional `config.label` is shown as a heading bar.
 - `tools/PluginTool.tsx`: draws any `PluginView` generically.
 - `tools/AnalyticsModule.tsx`: the analytics tile and its definition
   (`analyticsDef`: sizes, settings, metric list, "Collect now"). Display

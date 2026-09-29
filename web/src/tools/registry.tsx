@@ -69,7 +69,7 @@ export function buildRegistry(plugins: PluginMeta[]): ToolDef[] {
       name: "Notes",
       description: "Rich text notes with lists, numbering, highlight and color.",
       sizes: PANEL_SIZES,
-      configFields: [],
+      configFields: [{ key: "label", label: "Label (optional)", placeholder: "e.g. To do, Ideas, Launch checklist", help: "Shown as a heading at the top of the notes." }],
       render: (tool, onData) => <NotesModule tool={tool} onData={onData} />,
     },
     { ...analyticsDef, render: (tool) => <AnalyticsModule tool={tool} /> },

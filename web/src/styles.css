@@ -172,6 +172,11 @@ main { padding: 16px; }
 
 /* ---- Notes module */
 .notes { display: flex; flex-direction: column; height: 100%; }
+.notes-label {
+  padding: 0 10px; border-bottom: var(--line); line-height: 32px; flex-shrink: 0;
+  font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .notes-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; border-bottom: var(--thin); }
 .notes-toolbar button { min-width: 24px; height: 24px; padding: 0 4px; font-size: 13px; }
 .notes-toolbar button:hover, .notes-toolbar button.on { background: var(--ink); color: var(--paper); }
