@@ -41,7 +41,18 @@ export const supabase: Plugin = {
   name: "Supabase",
   description: "Project status, health, database size and backups. Restore a paused free-tier project in one click.",
   portalUrl: (c) => (c.projectRef ? `https://supabase.com/dashboard/project/${c.projectRef}` : "https://supabase.com/dashboard"),
-  env: [{ key: "SUPABASE_ACCESS_TOKEN", help: "Personal access token from supabase.com/dashboard/account/tokens." }],
+  env: [
+    {
+      key: "SUPABASE_ACCESS_TOKEN",
+      help: "A personal access token for Supabase's Management API.",
+      url: "https://supabase.com/dashboard/account/tokens",
+      steps: [
+        "Open the Access Tokens page in your Supabase account settings.",
+        "Press \"Generate new token\" and name it \"Management hub\".",
+        "Copy the token (it starts with sbp_) and paste it below. Supabase shows it only once.",
+      ],
+    },
+  ],
   configFields: [
     { key: "projectRef", label: "Project reference", placeholder: "abcdefghijklmnopqrst", required: true, help: "From your dashboard URL: /project/<reference>" },
     { key: "dbLimitMb", label: "Database size limit (MB)", placeholder: String(FREE_DB_LIMIT_MB), type: "number" },

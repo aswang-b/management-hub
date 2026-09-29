@@ -71,7 +71,18 @@ export const resend: Plugin = {
   name: "Resend",
   description: "Sending domains, recent emails and usage against your daily and monthly limits.",
   portalUrl: () => "https://resend.com/emails",
-  env: [{ key: "RESEND_API_KEY", help: "Full-access API key from resend.com/api-keys." }],
+  env: [
+    {
+      key: "RESEND_API_KEY",
+      help: "A Resend API key with full access.",
+      url: "https://resend.com/api-keys",
+      steps: [
+        "Open the API Keys page in Resend and press \"Create API key\".",
+        "Name it \"Management hub\" and set Permission to \"Full access\". A \"Sending access\" key can't read your domains or sent emails.",
+        "Press \"Add\", copy the key (it starts with re_) and paste it below. Resend shows it only once.",
+      ],
+    },
+  ],
   configFields: [
     { key: "dailyLimit", label: "Daily limit", placeholder: String(DEFAULT_DAILY), type: "number" },
     { key: "monthlyLimit", label: "Monthly limit", placeholder: String(DEFAULT_MONTHLY), type: "number" },

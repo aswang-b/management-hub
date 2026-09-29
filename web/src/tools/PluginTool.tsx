@@ -1,8 +1,9 @@
 // Plugin tool: draws the "view" a server-side plugin returns. Every plugin
 // uses this same component, so plugins only need server code.
 import { useCallback, useEffect, useState } from "react";
-import type { PluginAction, PluginResult, Tone, Tool } from "../../../shared/types.ts";
+import type { PluginAction, PluginMeta, PluginResult, Tone, Tool } from "../../../shared/types.ts";
 import { api } from "../api.ts";
+import { TOKENS_CHANGED, TokensDialog } from "../components/Tokens.tsx";
 
 const REFRESH_MS = 5 * 60_000;
 
@@ -11,11 +12,12 @@ export function ToneMark({ tone }: { tone?: Tone }) {
   return <span className={`tone tone-${tone ?? "neutral"}`}>{glyph}</span>;
 }
 
-export function PluginTool({ tool, name }: { tool: Tool; name: string }) {
+export function PluginTool({ tool, name, env }: { tool: Tool; name: string; env: PluginMeta["env"] }) {
   const [result, setResult] = useState<PluginResult>();
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string>();
   const [toast, setToast] = useState<{ text: string; bad?: boolean }>();
+  const [showTokens, setShowTokens] = useState(false);
 
   const load = useCallback(
     async (fresh = false) => {
@@ -36,7 +38,12 @@ export function PluginTool({ tool, name }: { tool: Tool; name: string }) {
   useEffect(() => {
     load();
     const t = setInterval(() => load(true), REFRESH_MS);
-    return () => clearInterval(t);
+    const onTokens = () => load(true);
+    window.addEventListener(TOKENS_CHANGED, onTokens);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener(TOKENS_CHANGED, onTokens);
+    };
   }, [load, configKey]);
 
   useEffect(() => {
@@ -70,6 +77,15 @@ export function PluginTool({ tool, name }: { tool: Tool; name: string }) {
   };
 
   const view = result?.view;
+  // A missing token, or one the service turned down, can be fixed right here.
+  const tokenFix =
+    result && !result.ok && env.length > 0
+      ? result.errorKind === "auth"
+        ? "Change token"
+        : result.errorKind === "setup" && env.some((e) => !e.set)
+          ? "Add token"
+          : undefined
+      : undefined;
   return (
     <div className="plugin">
       <div className="plugin-head">
@@ -97,6 +113,11 @@ export function PluginTool({ tool, name }: { tool: Tool; name: string }) {
           <div className={`plugin-error kind-${result.errorKind}`}>
             <strong>{errorTitle(result.errorKind)}</strong>
             <p>{result.error}</p>
+            {tokenFix && (
+              <button className="btn btn-small" onClick={() => setShowTokens(true)}>
+                {tokenFix}
+              </button>
+            )}
           </div>
         )}
 
@@ -157,6 +178,13 @@ export function PluginTool({ tool, name }: { tool: Tool; name: string }) {
       </div>
 
       {toast && <div className={`toast ${toast.bad ? "bad" : ""}`}>{toast.text}</div>}
+      {showTokens && (
+        <TokensDialog
+          title={`${name} token`}
+          plugins={[{ id: tool.type, name, description: "", env, configFields: [] }]}
+          onClose={() => setShowTokens(false)}
+        />
+      )}
     </div>
   );
 }

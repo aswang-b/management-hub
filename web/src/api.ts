@@ -17,6 +17,8 @@ export const api = {
   createProject: (name: string) => call<Project>("POST", "/projects", { name }),
   updateProject: (id: number, patch: Partial<Pick<Project, "name" | "gridWidth">>) => call<Project>("PATCH", `/projects/${id}`, patch),
   deleteProject: (id: number) => call("DELETE", `/projects/${id}`),
+  restoreProject: (id: number, snapshot: { name: string; gridWidth: number; tools: Tool[] }) =>
+    call<Project>("POST", `/projects/${id}/restore`, snapshot),
 
   tools: (projectId: number) => call<Tool[]>("GET", `/projects/${projectId}/tools`),
   createTool: (projectId: number, t: Omit<Tool, "id" | "projectId" | "data">) => call<Tool>("POST", `/projects/${projectId}/tools`, t),
@@ -29,6 +31,8 @@ export const api = {
   pluginView: (toolId: string, fresh = false) => call<PluginResult>("GET", `/tools/${toolId}/plugin${fresh ? "?fresh=1" : ""}`),
   pluginAction: (toolId: string, action: string, args?: Record<string, unknown>) =>
     call<{ ok: boolean; message?: string; error?: string }>("POST", `/tools/${toolId}/plugin/actions/${action}`, { args }),
+
+  setToken: (key: string, value: string) => call<{ ok: boolean; set: boolean }>("PUT", `/tokens/${encodeURIComponent(key)}`, { value }),
 
   metrics: () => call<{ series: Series[]; lastRun: CollectRun | null }>("GET", "/metrics"),
   collectMetrics: () => call<CollectRun>("POST", "/metrics/collect", {}),

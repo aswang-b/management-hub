@@ -40,7 +40,20 @@ export const cloudflare: Plugin = {
   name: "Cloudflare",
   description: "Zone status, SSL, DNS and 7-day traffic. Purge the cache or toggle development mode.",
   portalUrl: () => "https://dash.cloudflare.com",
-  env: [{ key: "CLOUDFLARE_API_TOKEN", help: "API token from dash.cloudflare.com/profile/api-tokens (see .env.example)." }],
+  env: [
+    {
+      key: "CLOUDFLARE_API_TOKEN",
+      help: "A Cloudflare API token limited to your domain.",
+      url: "https://dash.cloudflare.com/profile/api-tokens",
+      steps: [
+        "Open the API Tokens page in your Cloudflare profile and press \"Create Token\".",
+        "At the bottom, next to \"Create Custom Token\", press \"Get started\".",
+        "Name it \"Management hub\" and add these permissions (all under Zone): Zone: Read, Zone Settings: Edit, DNS: Read, Cache Purge: Purge, Analytics: Read.",
+        "Under Zone Resources, choose \"Include\", \"Specific zone\" and your domain.",
+        "Press \"Continue to summary\", then \"Create Token\". Copy it and paste it below. Cloudflare shows it only once.",
+      ],
+    },
+  ],
   configFields: [{ key: "zone", label: "Domain", placeholder: "example.com", required: true }],
 
   async load(ctx) {

@@ -85,6 +85,24 @@ code { font-family: var(--mono); font-size: 12px; background: var(--faint); padd
 .modal-head .icon-btn:hover { background: var(--paper); color: var(--ink); }
 .modal-body { padding: 16px; }
 .modal-body p { margin-top: 0; }
+.modal-wide { max-width: 600px; }
+
+/* ---- Tokens */
+.token-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.token { border: var(--thin); padding: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.token-missing { border-width: 2px; border-style: dashed; }
+.token-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.token-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.token-help { margin: 0; color: var(--mid); }
+.token details summary { cursor: pointer; font-weight: 600; }
+.token ol { margin: 6px 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.token details .btn { display: inline-block; text-decoration: none; }
+.token-input { display: flex; gap: 6px; }
+.token-input input { flex: 1; min-width: 0; border: var(--thin); padding: 6px 8px; font-family: var(--mono); font-size: 12px; outline: none; }
+.token-input input:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+.token-msg { font-size: 12px; font-weight: 600; }
+.token-msg.bad { border: var(--line); border-style: double; border-width: 3px; padding: 4px 6px; }
+.plugin-error .btn { margin-top: 8px; }
 
 /* ---- Workspace */
 main { padding: 16px; }

@@ -11,6 +11,12 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
   projects and tools, `saveLayout`, `cacheGet`/`cacheSet`, `clampWidth`.
 - `links.ts`: `linkInfo` (site title + icon), `favicon`, `openLocal`
   (open a local file or folder from a link tile).
+- `secrets.ts`: `saveToken` writes a plugin token into `.env` (keeping other
+  lines) and into `process.env`, so it works without a restart. `tokenProblem`
+  refuses pasted text with spaces or odd characters.
+- `db.ts` also has `restoreProject(id, snapshot)` for builder mode's
+  Undo/Redo/Revert: restores name, grid width, tools and their settings, but
+  keeps each surviving tool's `data` (e.g. notes text).
 - `metrics.ts`: analytics storage. Creates the `metrics` table (metric, ts,
   value, tags, source; one row per metric + tags + hour). `savePoints`,
   `listSeries`, and `analytics(config)`, which combines a range, compares it
@@ -26,6 +32,8 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
 |---|---|
 | `GET/POST /projects`, `PATCH/DELETE /projects/:id` | Projects |
 | `GET/POST /projects/:id/tools`, `PUT /projects/:id/layout` | Tiles on a grid |
+| `POST /projects/:id/restore` | Put a project back to a snapshot (Undo/Redo/Revert) |
+| `PUT /tokens/:key` | Save a plugin token to `.env` (only plugin token names; never read back) |
 | `PATCH/DELETE /tools/:id` | One tile |
 | `GET /plugins` | Plugin list + which tokens are set (never the tokens) |
 | `GET /tools/:id/plugin` | Load a plugin tile (`?fresh=1` skips the cache) |
@@ -38,6 +46,7 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
 ## Patterns
 - Tokens are read only on the server (`ctx.secret()`); responses never include them.
 - Grid width is clamped to `GRID_WIDTH` in `db.ts`.
-- Port is `HUB_PORT` (default 8787), host `HUB_HOST` (default 127.0.0.1).
+- Port is `HUB_PORT` (default 8787), host `HUB_HOST` (default 127.0.0.1),
+  settings file `HUB_ENV_FILE` (default `.env`; point it elsewhere for test runs).
 - Tests that need the database set `HUB_DB=":memory:"` before importing it
   (see `metrics.test.ts`).

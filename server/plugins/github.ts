@@ -37,7 +37,20 @@ export const github: Plugin = {
   name: "GitHub",
   description: "Workflow runs, pull requests, issues and security alerts for one repository.",
   portalUrl: (c) => (c.repo ? `https://github.com/${c.repo}` : "https://github.com"),
-  env: [{ key: "GITHUB_TOKEN", help: "Fine-grained personal access token (see .env.example for permissions)." }],
+  env: [
+    {
+      key: "GITHUB_TOKEN",
+      help: "A fine-grained personal access token for the repositories you show in the hub.",
+      url: "https://github.com/settings/personal-access-tokens/new",
+      steps: [
+        "Open GitHub's new fine-grained token page (sign in if asked).",
+        "Name it \"Management hub\" and pick an expiration date.",
+        "Under Repository access, choose \"Only select repositories\" and pick the repositories you'll add to the hub.",
+        "Under Permissions, add these repository permissions: Actions (Read and write), Contents (Read-only), Pull requests (Read-only), Issues (Read-only), Dependabot alerts (Read-only). Metadata (Read-only) is added by itself.",
+        "Press \"Generate token\", copy it (it starts with github_pat_) and paste it below. GitHub shows it only once.",
+      ],
+    },
+  ],
   configFields: [{ key: "repo", label: "Repository", placeholder: "owner/name", required: true }],
 
   async load(ctx) {

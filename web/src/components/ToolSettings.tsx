@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PluginConfigField, Tool } from "../../../shared/types.ts";
 import type { ToolDef } from "../tools/registry.tsx";
 import { Modal } from "./Modal.tsx";
+import { TokenList } from "./Tokens.tsx";
 
 export function ToolSettings({
   def,
@@ -21,7 +22,6 @@ export function ToolSettings({
       def.configFields.map((f) => [f.key, tool.config[f.key] == null ? (f.type === "select" && f.placeholder) || "" : String(tool.config[f.key])]),
     ),
   );
-  const missing = def.env?.filter((e) => !e.set) ?? [];
 
   // Some tools load their choices (e.g. which metrics exist) when the form opens.
   const [extra, setExtra] = useState<{ options?: Record<string, NonNullable<PluginConfigField["options"]>>; note?: string }>({});
@@ -81,17 +81,7 @@ export function ToolSettings({
         }}
       >
         <p className="muted">{def.description}</p>
-        {def.env && def.env.length > 0 && (
-          <div className="env-list">
-            {def.env.map((e) => (
-              <div key={e.key} className={e.set ? "" : "env-missing"}>
-                {e.set ? "✓" : "✕"} <code>{e.key}</code> {e.set ? "is set" : "is missing from .env"}
-                {!e.set && <small>{e.help}</small>}
-              </div>
-            ))}
-            {missing.length > 0 && <small>Add tokens to the .env file in the hub's folder, then restart the hub.</small>}
-          </div>
-        )}
+        {def.env && <TokenList entries={def.env.map((e) => ({ ...e, plugin: def.name }))} />}
         {def.configFields.map((f) => (
           <label key={f.key} className="field">
             <span>

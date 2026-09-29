@@ -82,11 +82,23 @@ export interface PluginConfigField {
   options?: { value: string; label: string }[];
 }
 
+/** A token a plugin reads from .env, with instructions for getting one. */
+export interface EnvVar {
+  key: string;
+  /** One line: what kind of token this is. */
+  help: string;
+  /** The service's page where the token is created. */
+  url?: string;
+  /** Step-by-step instructions shown in the hub. */
+  steps?: string[];
+}
+
 export interface PluginMeta {
   id: string;
   name: string;
   description: string;
-  env: { key: string; help: string; set: boolean }[];
+  /** Tokens, and whether each is set. The values never leave the server. */
+  env: (EnvVar & { set: boolean })[];
   configFields: PluginConfigField[];
 }
 
@@ -103,6 +115,50 @@ export function firstFreeSpot(taken: Rect[], cols: number, w: number, h: number)
       if (!taken.some((t) => overlaps(t, { x, y, w, h }))) return { x, y };
     }
   }
+}
+
+/**
+ * Where the other tools go while one is being dragged. Every tool starts from
+ * its position before the drag (`home`): it stays there if it doesn't touch
+ * the dragged tool, otherwise it moves to the nearest free spot. Because this
+ * always starts from `home`, tools slide back once the dragged tool moves on.
+ */
+export function makeRoom<T extends Rect & { i: string }>(home: T[], moving: T, cols: number): T[] {
+  const w = Math.min(moving.w, cols);
+  const placed: Rect[] = [{ ...moving, w, x: Math.max(0, Math.min(moving.x, cols - w)), y: Math.max(0, moving.y) }];
+  const out = new Map<string, T>([[moving.i, { ...moving, ...placed[0] }]]);
+  const others = home.filter((t) => t.i !== moving.i).sort((a, b) => a.y - b.y || a.x - b.x);
+
+  // First keep every tool that can stay at home, then find spots for the rest.
+  const displaced: T[] = [];
+  for (const t of others) {
+    if (placed.some((p) => overlaps(p, t))) displaced.push(t);
+    else {
+      placed.push(t);
+      out.set(t.i, t);
+    }
+  }
+  for (const t of displaced) {
+    const spot = nearestFreeSpot(placed, cols, t);
+    placed.push({ ...t, ...spot });
+    out.set(t.i, { ...t, ...spot });
+  }
+  return home.map((t) => out.get(t.i) ?? t).concat(home.some((t) => t.i === moving.i) ? [] : [out.get(moving.i)!]);
+}
+
+/** The free spot closest to where a tool is now (ties go to the higher, then left-most spot). */
+export function nearestFreeSpot(taken: Rect[], cols: number, t: Rect): { x: number; y: number } {
+  const w = Math.min(t.w, cols);
+  const maxY = taken.reduce((m, r) => Math.max(m, r.y + r.h), 0);
+  let best: { x: number; y: number; d: number } | undefined;
+  for (let y = 0; y <= maxY; y++) {
+    for (let x = 0; x + w <= cols; x++) {
+      const d = (x - t.x) ** 2 + (y - t.y) ** 2;
+      if (best && (d > best.d || (d === best.d && (y > best.y || (y === best.y && x >= best.x))))) continue;
+      if (!taken.some((r) => overlaps(r, { x, y, w, h: t.h }))) best = { x, y, d };
+    }
+  }
+  return best ? { x: best.x, y: best.y } : { x: 0, y: maxY };
 }
 
 /** Fits tools into a narrower grid: keeps each where it is when possible, otherwise moves it to the next free spot. */

@@ -83,7 +83,7 @@ export function buildRegistry(plugins: PluginMeta[]): ToolDef[] {
         sizes: PANEL_SIZES,
         configFields: p.configFields,
         env: p.env,
-        render: (tool) => <PluginTool tool={tool} name={p.name} />,
+        render: (tool) => <PluginTool tool={tool} name={p.name} env={p.env} />,
       }),
     ),
   ];

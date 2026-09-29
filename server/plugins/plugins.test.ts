@@ -95,7 +95,7 @@ test("github: missing token is a setup problem", async () => {
   delete process.env.GITHUB_TOKEN;
   const r = await runLoad(github, id(), { repo: "me/site" });
   assert.equal(r.errorKind, "setup");
-  assert.match(r.error!, /Add GITHUB_TOKEN to the \.env file/);
+  assert.match(r.error!, /needs GITHUB_TOKEN\. Press "Add token"/);
 });
 
 test("github: flags a changed API response", async () => {
@@ -265,22 +265,4 @@ test("status: reports each service and the overall state", async () => {
   assert.ok(r.ok, r.error ?? "");
   assert.equal(r.view!.status!.tone, "warn");
   assert.match(r.view!.sections![0].items[1].subtitle!, /Slow builds/);
-});
-
-// ---- Grid placement (shared by the server and the page)
-import { refit, overlaps } from "../../shared/types.ts";
-
-test("refit: shrinking the grid keeps tools from overlapping", () => {
-  const tools = [
-    { id: "a", x: 0, y: 0, w: 3, h: 1 },
-    { id: "b", x: 3, y: 0, w: 1, h: 1 },
-    { id: "c", x: 0, y: 1, w: 3, h: 3 },
-    { id: "d", x: 4, y: 1, w: 2, h: 2 },
-    { id: "e", x: 3, y: 4, w: 2, h: 2 },
-    { id: "f", x: 0, y: 0 + 8, w: 6, h: 2 },
-  ];
-  const out = refit(tools, 4);
-  for (const t of out) assert.ok(t.x >= 0 && t.x + t.w <= 4, `${t.id} fits`);
-  for (const a of out) for (const b of out) if (a !== b) assert.ok(!overlaps(a, b), `${a.id} and ${b.id} overlap`);
-  assert.deepEqual(out.find((t) => t.id === "a"), tools[0]); // untouched when it already fits
 });

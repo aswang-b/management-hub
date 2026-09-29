@@ -32,7 +32,19 @@ export const netlify: Plugin = {
   name: "Netlify",
   description: "Recent deploys with rebuild, retry and one-click rollback, plus bandwidth use.",
   portalUrl: (c) => (c.site ? `https://app.netlify.com/sites/${String(c.site).replace(/\.netlify\.app$/, "")}` : "https://app.netlify.com"),
-  env: [{ key: "NETLIFY_TOKEN", help: "Personal access token from app.netlify.com/user/applications." }],
+  env: [
+    {
+      key: "NETLIFY_TOKEN",
+      help: "A Netlify personal access token.",
+      url: "https://app.netlify.com/user/applications#personal-access-tokens",
+      steps: [
+        "Open the Applications page in your Netlify user settings.",
+        "Under \"Personal access tokens\", press \"New access token\".",
+        "Name it \"Management hub\", pick an expiration and generate it.",
+        "Copy the token and paste it below. Netlify shows it only once.",
+      ],
+    },
+  ],
   configFields: [{ key: "site", label: "Site", placeholder: "mysite.netlify.app", required: true }],
 
   async load(ctx) {

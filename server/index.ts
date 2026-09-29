@@ -5,10 +5,13 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 
-if (existsSync(".env")) process.loadEnvFile(".env");
+// Settings and tokens live in .env (HUB_ENV_FILE points elsewhere, e.g. for a test run).
+const ENV_FILE = process.env.HUB_ENV_FILE || ".env";
+if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 
 const db = await import("./db.ts");
-const { plugins, getPlugin, pluginMeta, runLoad, runAction } = await import("./plugins/index.ts");
+const { plugins, getPlugin, pluginMeta, runLoad, runAction, clearCache, tokenKeys } = await import("./plugins/index.ts");
+const { saveToken } = await import("./secrets.ts");
 const { linkInfo, favicon, isLocalPath, openLocal } = await import("./links.ts");
 const { analytics, listSeries } = await import("./metrics.ts");
 const { collectAll, lastRun, startCollector } = await import("./collector.ts");
@@ -58,6 +61,16 @@ api.post("/projects/:id/tools", async (c) => {
     db.createTool({ projectId, category: b.category, type: String(b.type), x: b.x, y: b.y, w: b.w, h: b.h, config: b.config ?? {}, data: b.data ?? {} }),
   );
 });
+// Builder mode's Undo and Revert send back an earlier snapshot of the project.
+api.post("/projects/:id/restore", async (c) => {
+  const b = await c.req.json();
+  if (!Array.isArray(b?.tools) || typeof b.gridWidth !== "number") return c.json({ error: "Expected a project snapshot" }, 400);
+  if (b.tools.some((t: any) => !["link", "plugin", "module"].includes(t?.category) || typeof t.id !== "string")) {
+    return c.json({ error: "Unknown tool in the snapshot" }, 400);
+  }
+  const p = db.restoreProject(Number(c.req.param("id")), { name: String(b.name ?? ""), gridWidth: b.gridWidth, tools: b.tools });
+  return p ? c.json(p) : c.json({ error: "Project not found" }, 404);
+});
 api.put("/projects/:id/layout", async (c) => {
   db.saveLayout(Number(c.req.param("id")), await c.req.json());
   return c.json({ ok: true });
@@ -86,6 +99,21 @@ api.post("/tools/:id/plugin/actions/:action", async (c) => {
   if (!t || !p) return c.json({ error: "Plugin not found" }, 404);
   const { args } = await c.req.json().catch(() => ({ args: {} }));
   return c.json(await runAction(p, t.id, t.config, c.req.param("action"), args));
+});
+
+// ---- Tokens: saved into .env. The page can set a plugin's token but never read one.
+api.put("/tokens/:key", async (c) => {
+  const key = c.req.param("key");
+  if (!tokenKeys().has(key)) return c.json({ ok: false, error: `${key} isn't a plugin token.` }, 400);
+  const { value } = await c.req.json().catch(() => ({ value: undefined }));
+  if (typeof value !== "string") return c.json({ ok: false, error: "Expected the token as text." }, 400);
+  try {
+    saveToken(key, value, ENV_FILE);
+  } catch (e) {
+    return c.json({ ok: false, error: (e as Error).message }, 400);
+  }
+  clearCache();
+  return c.json({ ok: true, set: Boolean(value.trim()) });
 });
 
 // ---- Analytics

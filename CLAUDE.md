@@ -23,12 +23,16 @@ More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
 - `server/check-plugins.ts`: `npm run check-plugins`, runs every plugin against real services.
 - `server/db.ts`: SQLite via built-in `node:sqlite` (file `data/hub.db`, `HUB_DB` overrides).
   The server port is `HUB_PORT`, not `PORT` (the browser pane sets `PORT` for dev commands).
+- `server/secrets.ts`: saves plugin tokens from the page into `.env` (`HUB_ENV_FILE`
+  overrides the file). Only plugin token names are accepted; values are never sent back.
 - `server/metrics.ts`: analytics storage (`metrics` table) and the maths for tiles.
   `server/collector.ts`: the hourly job that runs each plugin's `collect`.
 - `server/plugins/*.ts`: one file per service. Each exports a `Plugin`
   (`framework.ts`) and is registered in `plugins/index.ts`.
 - `web/src/`: React page. `tools/registry.tsx` lists tool types and sizes;
-  `components/Workspace.tsx` is the grid and builder mode.
+  `components/Workspace.tsx` is the grid and builder mode (other tools make
+  room while one is dragged: `makeRoom` in `shared/types.ts`); `useUndo.ts`
+  is builder mode's Undo/Redo/Revert; `components/Tokens.tsx` is the token UI.
 - `shared/types.ts`: shared types, including `PluginView`. `shared/metrics.ts`:
   analytics types, time ranges, value formatting.
 
@@ -36,7 +40,8 @@ More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
 - Plugins return a `PluginView` (status, stats, sections of items, actions,
   links). The page renders it generically with `PluginTool.tsx`; a new plugin
   should need no page changes. It does need: registration in `plugins/index.ts`,
-  its token in `.env.example` (where to create it, which permissions), a row in
+  its token in `env` with `url` and `steps` (shown in the hub) and in
+  `.env.example` (where to create it, which permissions), a row in
   the README plugin table, and tests in `plugins/plugins.test.ts`.
 - Use `request()` from `framework.ts` for HTTP so errors become plain-language
   messages. Call `expectShape()` on the main response so API changes show
@@ -46,6 +51,7 @@ More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
   names ending in `_bytes` are shown as sizes.
 - Actions that are destructive or publish something set `confirm`.
 - Tokens only come from `.env` via `ctx.secret()`; never send them to the page.
+- Builder-mode changes in `Workspace.tsx` call `onBeforeChange()` first so they can be undone.
 - Theme is strictly black/white with sharp corners (see `web/src/styles.css`).
   Status is shown with glyphs (● ▲ ■ ◐ ○) and inversion, not colors.
 - Grid width is 4 to 12 squares (`GRID_WIDTH`). Tool sizes are in `registry.tsx`.

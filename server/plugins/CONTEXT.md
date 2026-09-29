@@ -8,7 +8,8 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 
 ## The Plugin shape (`framework.ts`)
 - `id`, `name`, `description`, `portalUrl(config)`
-- `env`: tokens needed from `.env`, with help text
+- `env`: tokens needed from `.env`: `key`, one-line `help`, the service's
+  `url` for creating one, and `steps` shown in the hub's Tokens dialog
 - `configFields`: settings asked for in builder mode (e.g. repository)
 - `load(ctx)`: returns a `PluginView` (status, stats, sections, actions, links)
 - `actions`: named functions for buttons; return a short message
@@ -33,7 +34,7 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 ## Adding a plugin (checklist)
 1. New `<service>.ts` exporting a `Plugin`.
 2. Add it to the `plugins` array in `index.ts`.
-3. Token in `.env.example`: where to create it, which permissions.
+3. Token in `env` (with `url` and `steps`) and in `.env.example`: where to create it, which permissions.
 4. Row in the README plugin table.
 5. Tests in `plugins.test.ts` (network is faked) for `load` and each action.
 6. Actions that delete or publish set `confirm`.

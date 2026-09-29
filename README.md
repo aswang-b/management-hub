@@ -21,6 +21,14 @@ The original request, what's built so far and what's planned are in
   change their size (⇲), edit their settings (⚙) or remove them (✕). Press
   **Done** when finished. Everything saves automatically.
 
+  While you drag a tool, the tools in its way step aside to the nearest free
+  space, and slide back to their places once you drag past them.
+
+  **↶ Undo** and **↷ Redo** (or Ctrl+Z and Ctrl+Y) step back and forward
+  through your changes. **Revert** puts the project back the way it was when
+  you pressed **Build** (and can itself be undone). Text you typed into notes
+  is kept either way.
+
   ![Builder mode](docs/builder-mode.png)
 
 - **Tools** come in three kinds:
@@ -86,12 +94,16 @@ cp .env.example .env     # Windows: copy .env.example .env
 npm start
 ```
 
-Fill in the tokens you want in `.env`, then open <http://localhost:8787>.
-Plugins without a token show what to add.
+Then open <http://localhost:8787>.
 
-**Tokens** live only in `.env` on your computer. It is never committed to git.
-`.env.example` lists each one, where to create it and which permissions to give.
-Restart the hub after editing `.env`.
+**Tokens** let plugins reach your services. Press **Tokens** in the top bar
+(or **Add token** on a plugin tile that needs one): each token has
+step-by-step instructions for getting it from the service, a link to the
+right page, and a box to paste it into. It works straight away, with no restart.
+
+Tokens are saved only in the `.env` file on your computer, which is never
+committed to git. The hub never shows a saved token again: to change one,
+paste a new one. (You can also edit `.env` by hand; restart the hub after.)
 
 **Your data** (projects, tools, notes, saved numbers) is one file: `data/hub.db`. Copy it to
 back up the hub.

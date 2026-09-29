@@ -25,20 +25,23 @@ server/
   metrics.ts            analytics: metrics table, combining, chart buckets
   collector.ts          hourly job running each plugin's collect()
   links.ts              site title/favicon lookup, open local files
+  secrets.ts            save plugin tokens from the page into .env
   check-plugins.ts      npm run check-plugins
   plugins/
     framework.ts        Plugin interface, request(), expectShape(), optional()
     index.ts            plugin registry, 60 s result cache, runLoad/runAction
     github|supabase|netlify|cloudflare|resend|google|status.ts   one per service
     plugins.test.ts     tests for every plugin and action
+  *.test.ts             metrics, db (restore), secrets, grid placement
 shared/types.ts         types used by server and page (Project, Tool, PluginView, grid helpers)
 shared/metrics.ts       analytics types, ranges, value formatting
 web/
   index.html, public/   page shell, icon, PWA manifest
   src/
-    App.tsx             project switcher, builder-mode toggle
+    App.tsx             project switcher, builder-mode toggle, Undo/Redo/Revert, Tokens
+    useUndo.ts          builder-mode history (snapshots restored on the server)
     api.ts              fetch wrapper for /api
-    components/         Workspace (grid), Palette, ToolSettings, ProjectSettings, Modal
+    components/         Workspace (grid), Palette, ToolSettings, ProjectSettings, Modal, Tokens
     tools/              registry.tsx, LinkTool, NotesModule, PluginTool, AnalyticsModule, charts
     styles.css          black/white theme
 docs/

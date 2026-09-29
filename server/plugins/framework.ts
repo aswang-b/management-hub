@@ -6,7 +6,7 @@
 // `npm run check-plugins` runs every configured plugin and reports which
 // ones fail, so a broken plugin is easy to find.
 
-import type { PluginConfigField, PluginResult, PluginView } from "../../shared/types.ts";
+import type { EnvVar, PluginConfigField, PluginResult, PluginView } from "../../shared/types.ts";
 import type { MetricPoint } from "../../shared/metrics.ts";
 
 export interface PluginContext {
@@ -22,8 +22,8 @@ export interface Plugin {
   description: string;
   /** Link to the service's own website for this tile. */
   portalUrl(config: Record<string, string>): string;
-  /** Tokens this plugin needs from .env. */
-  env: { key: string; help: string }[];
+  /** Tokens this plugin needs from .env, with steps shown in the hub for getting them. */
+  env: EnvVar[];
   configFields: PluginConfigField[];
   load(ctx: PluginContext): Promise<PluginView>;
   actions: Record<string, (ctx: PluginContext, args: Record<string, unknown>) => Promise<string>>;
@@ -101,7 +101,7 @@ export async function request<T = any>(url: string, opts: RequestOptions): Promi
       throw new PluginError(
         "auth",
         `${opts.service} refused the request (${res.status}).` +
-          (opts.tokenKey ? ` Check that ${opts.tokenKey} in .env is correct and has the needed permissions.` : "") +
+          (opts.tokenKey ? ` The token (${opts.tokenKey}) may be wrong, expired or missing a permission: press "Change token" to replace it.` : "") +
           (detail ? ` ${opts.service} said: ${detail}` : ""),
       );
     }

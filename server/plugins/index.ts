@@ -32,7 +32,7 @@ function context(config: Record<string, unknown>): PluginContext {
     config: cfg,
     secret(key) {
       const v = process.env[key]?.trim();
-      if (!v) throw new PluginError("setup", `Add ${key} to the .env file in the hub's folder, then restart the hub.`);
+      if (!v) throw new PluginError("setup", `This plugin needs ${key}. Press "Add token" to add it; the steps to get one are shown there.`);
       return v;
     },
   };
@@ -47,6 +47,12 @@ function describe(e: unknown): Pick<PluginResult, "error" | "errorKind"> {
 // Results are cached briefly so reloading the page doesn't hit rate limits.
 const cache = new Map<string, { at: number; result: PluginResult }>();
 const CACHE_MS = 60_000;
+
+/** Forgets cached tiles, e.g. after a token changes. */
+export const clearCache = () => cache.clear();
+
+/** Every token name any plugin uses: the only .env keys the page may set. */
+export const tokenKeys = () => new Set(plugins.flatMap((p) => p.env.map((e) => e.key)));
 
 export async function runLoad(p: Plugin, toolId: string, config: Record<string, unknown>, fresh = false): Promise<PluginResult> {
   const key = `${toolId}:${JSON.stringify(config)}`;

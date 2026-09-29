@@ -128,6 +128,44 @@ export function saveLayout(projectId: number, items: { id: string; x: number; y:
   }
 }
 
+/** A project and its tools at one moment, for builder mode's Undo and Revert. */
+export interface Snapshot {
+  name: string;
+  gridWidth: number;
+  tools: Tool[];
+}
+
+/**
+ * Puts a project back to a snapshot: its name, grid width, and which tools
+ * exist with their places, sizes and settings. Content typed into a tool
+ * since then (e.g. notes) is kept for tools that still exist.
+ */
+export function restoreProject(id: number, snap: Snapshot): Project | undefined {
+  if (!getProject(id)) return undefined;
+  const keep = new Set(snap.tools.map((t) => t.id));
+  db.exec("BEGIN");
+  try {
+    db.prepare("UPDATE projects SET name = ?, grid_width = ? WHERE id = ?").run(snap.name.trim() || "Untitled", clampWidth(snap.gridWidth), id);
+    for (const t of listTools(id)) if (!keep.has(t.id)) deleteTool(t.id);
+    const update = db.prepare("UPDATE tools SET x = ?, y = ?, w = ?, h = ?, config = ? WHERE id = ? AND project_id = ?");
+    const insert = db.prepare(
+      "INSERT INTO tools (id, project_id, category, type, x, y, w, h, config, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    );
+    for (const t of snap.tools) {
+      const config = JSON.stringify(t.config ?? {});
+      const existing = getTool(t.id);
+      if (existing && existing.projectId !== id) continue; // never touch another project's tools
+      if (existing) update.run(t.x, t.y, t.w, t.h, config, t.id, id);
+      else insert.run(t.id, id, t.category, t.type, t.x, t.y, t.w, t.h, config, JSON.stringify(t.data ?? {}));
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return getProject(id);
+}
+
 export function deleteTool(id: string) {
   db.prepare("DELETE FROM tools WHERE id = ?").run(id);
 }

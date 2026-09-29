@@ -11,6 +11,17 @@ The React page. Built by Vite into `web/dist`, which the server serves.
   On phones (< 640 px) links sit 4 per row and everything else is full width.
 - `components/Palette.tsx`: list of tools to drag in, with size shapes.
 - `components/ToolSettings.tsx`, `ProjectSettings.tsx`, `Modal.tsx`: dialogs.
+  `Modal` renders into `document.body` (a portal) so dialogs opened from a
+  tile aren't clipped by the grid's transformed items.
+- `components/Tokens.tsx`: token rows (status, steps, link, paste box) used by
+  the top bar's Tokens dialog, plugin settings and a tile's "Add token". Saving
+  fires `TOKENS_CHANGED`; `App` reloads the plugin list and plugin tiles reload.
+- `useUndo.ts`: Undo/Redo/Revert. `Workspace` calls `onBeforeChange()` before
+  each change; snapshots are restored through `POST /projects/:id/restore`,
+  then the workspace remounts (App's `rev` key).
+- Dragging: `Workspace` gives the grid a custom compactor that runs
+  `makeRoom` (`shared/types.ts`) from the tools' saved spots on every move, so
+  pushed tools slide back. Positions are saved only on drag stop and drop.
 - In `npm run dev`, Vite forwards `/api` without changing the Host header
   (`changeOrigin: false`), or the server's cross-site check refuses changes.
 - `tools/registry.tsx`: every tool type and its allowed sizes. Plugins are
