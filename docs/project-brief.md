@@ -95,12 +95,8 @@ What this means for the design:
 pinned, shape checks, `check-plugins`, confirmations, and the status-page
 plugin. Google is a plugin tile of open incidents plus shortcut links, since
 Google has no API for those pages. **Not yet:** GitHub traffic and billing
-numbers, Supabase last-activity and pause warning, Cloudflare DNS
-records, Netlify deploy locking and build hooks. **Added since:** a
-Cloudflare Pages plugin (the site is moving from Netlify to Pages): deploy
-status, builds this month vs. 500, Workers/Functions requests today vs.
-100,000 (GraphQL `pagesFunctionsInvocationsAdaptiveGroups` +
-`workersInvocationsAdaptive`), custom domains, retry/rollback/rebuild.
+numbers, Supabase last-activity and pause warning, Cloudflare DNS and Pages
+deploys, Netlify deploy locking and build hooks.
 
 ---
 

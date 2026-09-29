@@ -2,49 +2,21 @@
 // and development mode.
 // API docs: https://developers.cloudflare.com/api
 import { expectShape, num, bytes, optional, request, type Plugin, type PluginContext } from "./framework.ts";
-import type { EnvVar, Tone } from "../../shared/types.ts";
+import type { Tone } from "../../shared/types.ts";
 
-export const API = "https://api.cloudflare.com/client/v4";
+const API = "https://api.cloudflare.com/client/v4";
 
-/** Calls Cloudflare's API. Status codes in `allow` return null instead of an error. */
-export async function cf<T = any>(ctx: PluginContext, path: string, init: { method?: string; body?: unknown; allow?: number[] } = {}): Promise<T> {
+async function cf<T = any>(ctx: PluginContext, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const res = await request(`${API}${path}`, {
     ...init,
     service: "Cloudflare",
     tokenKey: "CLOUDFLARE_API_TOKEN",
     headers: { Authorization: `Bearer ${ctx.secret("CLOUDFLARE_API_TOKEN")}` },
   });
-  if (res === null && init.allow) return null as T;
   // Cloudflare wraps every response in { success, errors, result }.
   expectShape(res && "result" in res, "Cloudflare", path.split("?")[0]);
   return (path.includes("dns_records") ? res : res.result) as T;
 }
-
-/** Runs a GraphQL Analytics query. */
-export function cfGraphql(ctx: PluginContext, query: string, variables: Record<string, unknown>) {
-  return request(`${API}/graphql`, {
-    method: "POST",
-    service: "Cloudflare",
-    tokenKey: "CLOUDFLARE_API_TOKEN",
-    headers: { Authorization: `Bearer ${ctx.secret("CLOUDFLARE_API_TOKEN")}` },
-    body: { query, variables },
-  });
-}
-
-/** One token serves both Cloudflare plugins (the zone one and Pages). */
-export const CLOUDFLARE_TOKEN: EnvVar = {
-  key: "CLOUDFLARE_API_TOKEN",
-  help: "A Cloudflare API token limited to your domain and account. The Cloudflare and Cloudflare Pages plugins share it.",
-  url: "https://dash.cloudflare.com/profile/api-tokens",
-  steps: [
-    "Open the API Tokens page in your Cloudflare profile. Already have a token for the other Cloudflare plugin? Press ⋯ next to it, then \"Edit\", add the permissions below and save: the token itself stays the same. Otherwise press \"Create Token\", and at the bottom next to \"Create Custom Token\" press \"Get started\".",
-    "Name it \"Management hub\" and add the permissions for the plugins you use.",
-    "Cloudflare plugin (your domain), all under Zone: Zone: Read, Zone Settings: Edit, DNS: Read, Cache Purge: Purge, Analytics: Read.",
-    "Cloudflare Pages plugin, under Account: Cloudflare Pages: Edit (Read is enough if you don't need the Retry, Roll back and Rebuild buttons), Account Analytics: Read.",
-    "Under Account Resources choose \"Include\" and your account. Under Zone Resources choose \"Include\", \"Specific zone\" and your domain.",
-    "Press \"Continue to summary\", then \"Create Token\" (or \"Update Token\"). For a new token, copy it and paste it below. Cloudflare shows it only once.",
-  ],
-};
 
 async function zone(ctx: PluginContext) {
   const name = ctx.config.zone?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -68,7 +40,20 @@ export const cloudflare: Plugin = {
   name: "Cloudflare",
   description: "Zone status, SSL, DNS and 7-day traffic. Purge the cache or toggle development mode.",
   portalUrl: () => "https://dash.cloudflare.com",
-  env: [CLOUDFLARE_TOKEN],
+  env: [
+    {
+      key: "CLOUDFLARE_API_TOKEN",
+      help: "A Cloudflare API token limited to your domain.",
+      url: "https://dash.cloudflare.com/profile/api-tokens",
+      steps: [
+        "Open the API Tokens page in your Cloudflare profile and press \"Create Token\".",
+        "At the bottom, next to \"Create Custom Token\", press \"Get started\".",
+        "Name it \"Management hub\" and add these permissions (all under Zone): Zone: Read, Zone Settings: Edit, DNS: Read, Cache Purge: Purge, Analytics: Read.",
+        "Under Zone Resources, choose \"Include\", \"Specific zone\" and your domain.",
+        "Press \"Continue to summary\", then \"Create Token\". Copy it and paste it below. Cloudflare shows it only once.",
+      ],
+    },
+  ],
   configFields: [{ key: "zone", label: "Domain", placeholder: "example.com", required: true }],
 
   async load(ctx) {
@@ -79,7 +64,12 @@ export const cloudflare: Plugin = {
       optional(cf(ctx, `/zones/${z.id}/settings/ssl`)),
       optional(cf(ctx, `/zones/${z.id}/dns_records?per_page=1`)),
       optional(
-        cfGraphql(ctx, TRAFFIC_QUERY, { zone: z.id, since }),
+        request(`${API}/graphql`, {
+          method: "POST",
+          service: "Cloudflare",
+          headers: { Authorization: `Bearer ${ctx.secret("CLOUDFLARE_API_TOKEN")}` },
+          body: { query: TRAFFIC_QUERY, variables: { zone: z.id, since } },
+        }),
       ),
     ]);
 

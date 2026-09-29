@@ -3,7 +3,7 @@
 One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 
 ## Current plugins
-`github`, `supabase`, `netlify`, `cloudflare`, `cloudflare-pages`, `resend`, `google`, `status`
+`github`, `supabase`, `netlify`, `cloudflare`, `resend`, `google`, `status`
 (registered in `index.ts`, in that order).
 
 ## The Plugin shape (`framework.ts`)
@@ -15,10 +15,7 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 - `actions`: named functions for buttons; return a short message
 - `collect(ctx)` (optional): numbers to save hourly for analytics, as
   `{ metric, value, tags? }`. Add a `<metric>.limit` point for a gauge.
-  Used by `resend`, `netlify` (credits, or bandwidth on older plans) and
-  `cloudflare-pages` (builds this month, Workers/Functions requests today).
-- Two plugins can share a token by using the same `EnvVar` object
-  (`CLOUDFLARE_TOKEN` in `cloudflare.ts`); the Tokens dialog shows it once.
+  Used by `resend` and `netlify` (credits, or bandwidth on older plans).
 
 ## Helpers
 - `request(url, opts)`: HTTP with errors turned into plain-language messages.

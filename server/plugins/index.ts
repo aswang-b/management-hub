@@ -7,12 +7,11 @@ import { github } from "./github.ts";
 import { supabase } from "./supabase.ts";
 import { netlify } from "./netlify.ts";
 import { cloudflare } from "./cloudflare.ts";
-import { cloudflarePages } from "./cloudflare-pages.ts";
 import { resend } from "./resend.ts";
 import { google } from "./google.ts";
 import { status } from "./status.ts";
 
-export const plugins: Plugin[] = [github, supabase, netlify, cloudflare, cloudflarePages, resend, google, status];
+export const plugins: Plugin[] = [github, supabase, netlify, cloudflare, resend, google, status];
 
 export const getPlugin = (id: string) => plugins.find((p) => p.id === id);
 
