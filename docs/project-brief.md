@@ -75,7 +75,7 @@ only in `.env` on your computer, never in the browser or in git.
 | **Google Cloud** | The sign-in Audience page (publishing status, test users) has **no API**. Monitoring and Billing Budgets APIs exist but need a service account | Cloud Monitoring (only if you run things in Google Cloud) | Billing Budgets API or billing export | Service account key (more setup) |
 | **Resend** | Domains (status, re-verify), API keys, contacts, broadcasts, sent emails | Status of each email (delivered, bounced, opened) | No single quota endpoint. Count sent emails per day and month against the limit | API key |
 | **Cloudflare** | DNS records, cache purge, Pages deploys, SSL status, firewall rules | Requests, bandwidth, threats, page views (GraphQL Analytics API) | Free plan mostly not billed; Workers/Pages usage via GraphQL | Scoped API token |
-| **Netlify** | Deploys: retry, roll back, lock, build hooks, env variables, form submissions | Netlify Analytics is a paid add-on | Bandwidth/usage endpoints (Netlify moved to credit-based plans; check the current endpoint) | Personal access token |
+| **Netlify** | Deploys: retry, roll back, lock, build hooks, env variables, form submissions | Netlify Analytics is a paid add-on | Credit balance (undocumented `capabilities.credits` on the account); bandwidth endpoint on older plans | Personal access token |
 
 What this means for the design:
 
@@ -156,7 +156,7 @@ Chart library: Recharts or uPlot (easy to keep black/white).
 - Pull: plugins can have a `collect` step; `server/collector.ts` runs it for
   every plugin tile when the hub starts (if this hour isn't done) and then
   hourly. Resend (emails today/month, bounces, limits) and Netlify
-  (bandwidth and allowance) save numbers.
+  (credits used/left and allowance; bandwidth on older plans) save numbers.
 - The Analytics tile with all four displays, sum/average/latest/count, a
   "Collect now" button, and Recharts for the full chart.
 

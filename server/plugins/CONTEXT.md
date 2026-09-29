@@ -15,7 +15,7 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 - `actions`: named functions for buttons; return a short message
 - `collect(ctx)` (optional): numbers to save hourly for analytics, as
   `{ metric, value, tags? }`. Add a `<metric>.limit` point for a gauge.
-  Used by `resend` and `netlify`.
+  Used by `resend` and `netlify` (credits, or bandwidth on older plans).
 
 ## Helpers
 - `request(url, opts)`: HTTP with errors turned into plain-language messages.
