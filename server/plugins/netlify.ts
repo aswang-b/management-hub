@@ -42,29 +42,65 @@ interface Credits {
   remaining: number;
   resets?: string;
   exceeded: boolean;
+  /** How `used` was worked out (see `credits`). */
+  estimate: { deploys: number; deployCredits: number; bandwidthBytes: number; bandwidthCredits: number };
 }
 
 const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v && typeof v === "object" ? Object.keys(v).length > 0 : Boolean(v));
+const MAX_PAGES = 5;
+
+/** Successful production deploys of every site in the team since `since` (these cost credits). */
+async function productionDeploysSince(ctx: PluginContext, slug: string, since: Date): Promise<number> {
+  const sites = await nf<any[]>(ctx, "/sites?filter=all&per_page=100");
+  expectShape(Array.isArray(sites), "Netlify", "site list");
+  let count = 0;
+  for (const s of sites.filter((s) => s?.account_slug === slug)) {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const list = await nf<any[]>(ctx, `/sites/${s.id}/deploys?production=true&per_page=100&page=${page}`);
+      expectShape(Array.isArray(list), "Netlify", "deploy list");
+      const inPeriod = list.filter((d) => new Date(d.created_at) >= since);
+      count += inPeriod.filter((d) => d.context === "production" && d.state === "ready").length;
+      if (list.length < 100 || inPeriod.length < list.length) break; // newest first: older pages are outside the period
+    }
+  }
+  return count;
+}
 
 /**
- * The team's credit balance. Not in Netlify's published API docs, so it's
- * read carefully: undefined (not an error) on older plans or if it changes.
+ * The team's credits. Netlify's API reports the plan's allowance and period,
+ * but not credits used (its `capabilities.credits.used` stays 0), so usage
+ * is estimated from what the API does report: production deploys this period
+ * and bandwidth. Web requests and function compute aren't reported anywhere,
+ * so the estimate leaves them out. Undefined (not an error) on older plans or
+ * if the account data changes; none of this is in Netlify's published docs.
  */
-async function credits(ctx: PluginContext, slug: string | undefined): Promise<Credits | undefined> {
+async function credits(ctx: PluginContext, slug: string | undefined, bandwidthUsed: number | undefined): Promise<Credits | undefined> {
   if (!slug) return undefined;
   const accounts = await optional(nf<any[]>(ctx, "/accounts"));
   let account = Array.isArray(accounts) ? accounts.find((a) => a?.slug === slug) : undefined;
   if (account?.id && !account.capabilities?.credits) account = await optional(nf(ctx, `/accounts/${account.id}`));
-  const c = account?.capabilities?.credits;
-  const included = Number(c?.included);
-  const used = Number(c?.used);
-  if (!Number.isFinite(included) || !Number.isFinite(used) || included <= 0) return undefined;
+  const included = Number(account?.capabilities?.credits?.included);
+  const since = new Date(account?.current_usage_period_start);
+  if (!Number.isFinite(included) || included <= 0 || Number.isNaN(since.getTime())) return undefined;
+
+  const deploys = (await optional(productionDeploysSince(ctx, slug, since))) ?? 0;
+  const bandwidthBytes = Number.isFinite(bandwidthUsed) ? bandwidthUsed! : 0;
+  const estimate = {
+    deploys,
+    deployCredits: deploys * CREDIT_COSTS.deploy,
+    bandwidthBytes,
+    bandwidthCredits: (bandwidthBytes / 1e9) * CREDIT_COSTS.perBandwidthGb,
+  };
+  const reported = Number(account.capabilities.credits.used) || 0;
+  // If Netlify starts reporting real usage, it will be at least our estimate.
+  const used = Math.round(Math.max(reported, estimate.deployCredits + estimate.bandwidthCredits));
   return {
     included,
     used,
     remaining: Math.max(0, included - used),
     resets: account.next_usage_period_start,
     exceeded: nonEmpty(account.usages_exceeded),
+    estimate,
   };
 }
 
@@ -105,11 +141,11 @@ export const netlify: Plugin = {
   async load(ctx) {
     const s = await nf(ctx, `/sites/${encodeURIComponent(site(ctx))}`);
     expectShape(s && typeof s.id === "string", "Netlify", "site details");
-    const [deploys, credit, bandwidth] = await Promise.all([
+    const [deploys, bandwidth] = await Promise.all([
       nf<any[]>(ctx, `/sites/${s.id}/deploys?per_page=6`),
-      credits(ctx, s.account_slug),
       s.account_slug ? optional(nf(ctx, `/accounts/${s.account_slug}/bandwidth`)) : undefined,
     ]);
+    const credit = await credits(ctx, s.account_slug, Number(bandwidth?.used));
     expectShape(Array.isArray(deploys), "Netlify", "deploy list");
 
     const publishedId = s.published_deploy?.id;
@@ -140,11 +176,24 @@ export const netlify: Plugin = {
     const creditTone: Tone = out ? "bad" : credit && credit.remaining / credit.included < 0.2 ? "warn" : "ok";
     const creditStats = credit
       ? [
-          { label: "Credits used", value: `${num(credit.used)} / ${num(credit.included)}`, tone: creditTone, limit: { used: credit.used, max: credit.included } },
-          { label: "Credits left", value: num(credit.remaining), tone: creditTone },
+          { label: "Credits used (est.)", value: `~${num(credit.used)} / ${num(credit.included)}`, tone: creditTone, limit: { used: credit.used, max: credit.included } },
+          { label: "Credits left (est.)", value: `~${num(credit.remaining)}`, tone: creditTone },
           ...(daysUntil(credit.resets) ? [{ label: "Credits reset", value: daysUntil(credit.resets)! }] : []),
         ]
       : [];
+    const e = credit?.estimate;
+    const spentSection = e && {
+      title: "Where credits went this period (estimate)",
+      items: [
+        { title: `${num(e.deploys)} production deploys: ${num(e.deployCredits)} credits`, subtitle: `All sites in the team, ${CREDIT_COSTS.deploy} credits each` },
+        { title: `${bytes(e.bandwidthBytes)} bandwidth: ${num(Math.round(e.bandwidthCredits))} credits`, subtitle: `${CREDIT_COSTS.perBandwidthGb} credits per GB` },
+        {
+          title: "Web requests and compute: not included",
+          subtitle: "Netlify's API doesn't report these, so the real total can be a bit higher. The Usage link shows the exact number.",
+          url: `https://app.netlify.com/teams/${s.account_slug}/billing/usage`,
+        },
+      ],
+    };
     const left = credit && creditEquivalents(credit.remaining);
     const creditSection = left && {
       title: "Credits left are enough for (any one of these)",
@@ -177,9 +226,13 @@ export const netlify: Plugin = {
         ...(bw ? [bw] : []),
       ],
       notice: out
-        ? `Netlify says this team's credits are used up. New production deploys are blocked, and once the balance hits zero Netlify pauses the team's sites. Add credits on the Usage page${daysUntil(credit!.resets) ? `, or wait until they reset ${daysUntil(credit!.resets)}` : ""}.`
+        ? `${credit!.exceeded ? "Netlify says this team's credits are used up. New production deploys are blocked, and" : "By the hub's estimate this team's credits are used up (check the Usage page). Netlify blocks new production deploys, and"} once the balance hits zero Netlify pauses the team's sites. Add credits on the Usage page${daysUntil(credit!.resets) ? `, or wait until they reset ${daysUntil(credit!.resets)}` : ""}.`
         : undefined,
-      sections: [...(creditSection ? [creditSection] : []), { title: "Recent deploys", items, empty: "No deploys yet." }],
+      sections: [
+        ...(creditSection ? [creditSection] : []),
+        ...(spentSection ? [spentSection] : []),
+        { title: "Recent deploys", items, empty: "No deploys yet." },
+      ],
       actions: [
         { id: "build", label: "Rebuild site" },
         { id: "buildClean", label: "Clear cache & rebuild", confirm: "Clear the build cache and rebuild?" },
@@ -198,7 +251,8 @@ export const netlify: Plugin = {
   async collect(ctx) {
     const s = await nf(ctx, `/sites/${encodeURIComponent(site(ctx))}`);
     expectShape(s && typeof s.id === "string" && s.account_slug, "Netlify", "site details");
-    const [credit, bw] = await Promise.all([credits(ctx, s.account_slug), optional(nf(ctx, `/accounts/${s.account_slug}/bandwidth`))]);
+    const bw = await optional(nf(ctx, `/accounts/${s.account_slug}/bandwidth`));
+    const credit = await credits(ctx, s.account_slug, Number(bw?.used));
     const hasBandwidth = Number.isFinite(bw?.used);
     expectShape(credit || hasBandwidth, "Netlify", "credit balance or bandwidth");
     const tags = { account: String(s.account_slug) };

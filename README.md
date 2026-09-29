@@ -45,7 +45,7 @@ The original request, what's built so far and what's planned are in
 |---|---|---|
 | GitHub | Latest workflow runs, open PRs and issues, security alerts | Re-run (failed) workflows, run a workflow by hand |
 | Supabase | Project status (paused?), service health, database size vs. limit, last backup | Restore a paused project, pause |
-| Netlify | Recent deploys; credits used and left, when they reset, and what the rest is worth in deploys, web requests, compute or bandwidth (older plans: bandwidth vs. plan) | Rebuild, clear cache & rebuild, retry a failed deploy, roll back to an older deploy |
+| Netlify | Recent deploys; credits used and left (an estimate from production deploys and bandwidth, since Netlify's API doesn't report web requests or compute), when they reset, and what the rest is worth in deploys, web requests, compute or bandwidth (older plans: bandwidth vs. plan) | Rebuild, clear cache & rebuild, retry a failed deploy, roll back to an older deploy |
 | Cloudflare | Zone status, SSL mode, DNS count, 7-day requests, visitors, bandwidth, cache rate, threats | Purge cache, toggle development mode |
 | Resend | Domain verification, recent emails, emails sent today and this month vs. limits, bounces | Re-verify a domain, send a test email |
 | Google Cloud | Open Google Cloud incidents | Shortcuts to the sign-in Audience, OAuth clients, branding, billing and quotas pages (Google has no API for these) |
@@ -61,7 +61,7 @@ your projects:
 | From | Numbers |
 |---|---|
 | Resend | Emails sent today and this month (with your daily and monthly limits), bounces this month |
-| Netlify | Credits used (with your plan's allowance) and credits left; on older plans, bandwidth used |
+| Netlify | Credits used (estimated, with your plan's allowance), credits left, bandwidth used |
 
 An **Analytics** tile (under Modules in builder mode) charts one of these
 numbers. Its settings (⚙) pick the number, the time range (24 hours to 90

@@ -75,7 +75,7 @@ only in `.env` on your computer, never in the browser or in git.
 | **Google Cloud** | The sign-in Audience page (publishing status, test users) has **no API**. Monitoring and Billing Budgets APIs exist but need a service account | Cloud Monitoring (only if you run things in Google Cloud) | Billing Budgets API or billing export | Service account key (more setup) |
 | **Resend** | Domains (status, re-verify), API keys, contacts, broadcasts, sent emails | Status of each email (delivered, bounced, opened) | No single quota endpoint. Count sent emails per day and month against the limit | API key |
 | **Cloudflare** | DNS records, cache purge, Pages deploys, SSL status, firewall rules | Requests, bandwidth, threats, page views (GraphQL Analytics API) | Free plan mostly not billed; Workers/Pages usage via GraphQL | Scoped API token |
-| **Netlify** | Deploys: retry, roll back, lock, build hooks, env variables, form submissions | Netlify Analytics is a paid add-on | Credit balance (undocumented `capabilities.credits` on the account); bandwidth endpoint on older plans | Personal access token |
+| **Netlify** | Deploys: retry, roll back, lock, build hooks, env variables, form submissions | Netlify Analytics is a paid add-on | Allowance and period on the account (undocumented `capabilities.credits`, whose `used` stays 0); credits used must be estimated from production deploys and `/accounts/{slug}/bandwidth`. No API reports web-request or compute credits (checked 2026-09-28) | Personal access token |
 
 What this means for the design:
 

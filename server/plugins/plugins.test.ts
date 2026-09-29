@@ -253,64 +253,88 @@ test("netlify: saves bandwidth and the plan's allowance, tagged by team", async 
   ]);
 });
 
-const inDays = (d: number) => new Date(Date.now() + d * 86400_000).toISOString().slice(0, 10);
-const creditRoutes = (used: number, extra: object = {}): Route[] => [
+const inDays = (d: number) => new Date(Date.now() + d * 86400_000).toISOString();
+const deploy = (daysAgo: number, state = "ready", context = "production") => ({ id: `d${Math.random()}`, state, context, created_at: inDays(-daysAgo) });
+// A team on a credit plan. Netlify reports the allowance and period but always "used: 0".
+const creditRoutes = (o: { deploys?: object[]; bandwidth?: number; used?: number; extra?: object } = {}): Route[] => [
   ["GET", /\/sites\/my\.netlify\.app$/, { id: "s1", name: "my", account_slug: "team", published_deploy: { id: "d1" } }],
+  ["GET", /\/sites\?filter=all/, [{ id: "s1", account_slug: "team" }, { id: "s9", account_slug: "someone-else" }]],
+  ["GET", /\/sites\/s1\/deploys\?production=true&per_page=100&page=1$/, o.deploys ?? []],
+  ["GET", /\/sites\/s9\/deploys/, [deploy(1), deploy(1)]], // another team's site: never counted
   ["GET", /\/sites\/s1\/deploys\?/, []],
-  ["GET", /\/accounts$/, [{ id: "a1", slug: "team", capabilities: { credits: { included: 3000, used } }, next_usage_period_start: inDays(17), ...extra }]],
+  ["GET", /\/accounts\/team\/bandwidth$/, { used: o.bandwidth ?? 0, included: null }],
+  ["GET", /\/accounts$/, [{
+    id: "a1", slug: "team", capabilities: { credits: { included: 300, used: o.used ?? 0 } },
+    current_usage_period_start: inDays(-20), next_usage_period_start: inDays(10), ...o.extra,
+  }]],
 ];
+const fourteenDeploys = [...Array.from({ length: 14 }, (_, i) => deploy(i)), deploy(2, "error"), deploy(30)];
 
-test("netlify: shows credits left and what they're worth", async () => {
-  routes = creditRoutes(660);
+test("netlify: estimates credits used from deploys and bandwidth, since Netlify reports 0", async () => {
+  routes = creditRoutes({ deploys: fourteenDeploys, bandwidth: 153406447 });
   const r = await runLoad(netlify, id(), { site: "my.netlify.app" });
   assert.ok(r.ok, r.error ?? "");
   const stats = Object.fromEntries(r.view!.stats!.map((s) => [s.label, s]));
-  assert.equal(stats["Credits used"].value, "660 / 3,000");
-  assert.deepEqual(stats["Credits used"].limit, { used: 660, max: 3000 });
-  assert.equal(stats["Credits left"].value, "2,340");
-  assert.match(stats["Credits reset"].value, /in 1[78] days/);
-  assert.equal(stats["Bandwidth this period"], undefined); // credits replace the bandwidth bar
-  // 2,340 credits = 156 deploys (15 each), 11.7M requests (2 per 10k), 234 GB-hours (10 each), 117 GB (20 per GB).
-  const worth = r.view!.sections![0].items.map((i) => i.title);
-  assert.deepEqual(worth, ["156 production deploys", "11.7M web requests", "234 GB-hours of compute", "117 GB of bandwidth"]);
+  // 14 successful production deploys this period x 15 = 210, plus 0.153 GB x 20 = 3 (the failed and last-period deploys are free).
+  assert.equal(stats["Credits used (est.)"].value, "~213 / 300");
+  assert.deepEqual(stats["Credits used (est.)"].limit, { used: 213, max: 300 });
+  assert.equal(stats["Credits left (est.)"].value, "~87");
+  assert.match(stats["Credits reset"].value, /in (9|10) days/);
+  assert.equal(stats["Bandwidth this period"], undefined);
+
+  const [worth, spent] = r.view!.sections!;
+  // 87 credits = 5 deploys, 430K requests, 8.7 GB-hours, 4.35 GB of bandwidth.
+  assert.deepEqual(worth.items.map((i) => i.title), ["5 production deploys", "430K web requests", "8.7 GB-hours of compute", "4.3 GB of bandwidth"]);
+  assert.match(spent.title, /estimate/);
+  assert.equal(spent.items[0].title, "14 production deploys: 210 credits");
+  assert.equal(spent.items[1].title, "153 MB bandwidth: 3 credits");
+  assert.match(spent.items[2].title, /not included/);
   assert.equal(r.view!.notice, undefined);
 });
 
-test("netlify: warns when credits run low or out", async () => {
-  routes = creditRoutes(2500);
-  let r = await runLoad(netlify, id(), { site: "my.netlify.app" });
-  assert.equal(r.view!.stats!.find((s) => s.label === "Credits left")!.tone, "warn");
-
-  routes = creditRoutes(3000);
-  r = await runLoad(netlify, id(), { site: "my.netlify.app" });
-  assert.equal(r.view!.stats!.find((s) => s.label === "Credits left")!.tone, "bad");
-  assert.match(r.view!.notice!, /credits are used up/);
-
-  // Netlify can flag a team as over its limit even with credits showing.
-  routes = creditRoutes(10, { usages_exceeded: ["credits"] });
-  r = await runLoad(netlify, id(), { site: "my.netlify.app" });
-  assert.match(r.view!.notice!, /New production deploys are blocked/);
-});
-
-test("netlify: reads credits from the team's own page when the list leaves them out", async () => {
-  routes = [
-    ...creditRoutes(0).slice(0, 2),
-    ["GET", /\/accounts$/, [{ id: "a1", slug: "team" }]],
-    ["GET", /\/accounts\/a1$/, { id: "a1", slug: "team", capabilities: { credits: { included: 300, used: 150 } } }],
-  ];
+test("netlify: uses Netlify's own figure if it ever reports more than the estimate", async () => {
+  routes = creditRoutes({ deploys: [deploy(1)], used: 120 });
   const r = await runLoad(netlify, id(), { site: "my.netlify.app" });
-  assert.equal(r.view!.stats!.find((s) => s.label === "Credits left")!.value, "150");
+  assert.equal(r.view!.stats!.find((s) => s.label.startsWith("Credits left"))!.value, "~180");
 });
 
-test("netlify: saves credits for analytics on credit-based plans", async () => {
-  routes = creditRoutes(660); // no bandwidth endpoint on these plans
+test("netlify: warns when credits run low or out", async () => {
+  routes = creditRoutes({ deploys: Array.from({ length: 17 }, () => deploy(1)) }); // 255 of 300
+  let r = await runLoad(netlify, id(), { site: "my.netlify.app" });
+  assert.equal(r.view!.stats!.find((s) => s.label.startsWith("Credits left"))!.tone, "warn");
+
+  routes = creditRoutes({ deploys: Array.from({ length: 20 }, () => deploy(1)) }); // 300 of 300
+  r = await runLoad(netlify, id(), { site: "my.netlify.app" });
+  assert.equal(r.view!.stats!.find((s) => s.label.startsWith("Credits left"))!.tone, "bad");
+  assert.match(r.view!.notice!, /By the hub's estimate/);
+
+  // Netlify can flag a team as over its limit.
+  routes = creditRoutes({ extra: { usages_exceeded: ["credits"] } });
+  r = await runLoad(netlify, id(), { site: "my.netlify.app" });
+  assert.match(r.view!.notice!, /Netlify says .* New production deploys are blocked/);
+});
+
+test("netlify: counts deploys across pages until they're older than the period", async () => {
+  routes = creditRoutes();
+  routes.unshift(
+    ["GET", /deploys\?production=true&per_page=100&page=1$/, Array.from({ length: 100 }, () => deploy(1))],
+    ["GET", /deploys\?production=true&per_page=100&page=2$/, [deploy(2), deploy(40)]],
+  );
+  const r = await runLoad(netlify, id(), { site: "my.netlify.app" });
+  assert.equal(r.view!.sections![1].items[0].title, "101 production deploys: 1,515 credits");
+  assert.ok(!calls.some((c) => /page=3/.test(c.url)));
+});
+
+test("netlify: saves estimated credits for analytics", async () => {
+  routes = creditRoutes({ deploys: fourteenDeploys, bandwidth: 153406447 });
   const r = await runCollect(netlify, { site: "my.netlify.app" });
   assert.ok(r.ok, r.error ?? "");
   const tags = { account: "team" };
   assert.deepEqual(r.points, [
-    { metric: "netlify.credits_used", value: 660, tags },
-    { metric: "netlify.credits_used.limit", value: 3000, tags },
-    { metric: "netlify.credits_left", value: 2340, tags },
+    { metric: "netlify.credits_used", value: 213, tags },
+    { metric: "netlify.credits_used.limit", value: 300, tags },
+    { metric: "netlify.credits_left", value: 87, tags },
+    { metric: "netlify.bandwidth_bytes", value: 153406447, tags },
   ]);
 });
 
