@@ -11,6 +11,7 @@ import { cloudflare } from "./cloudflare.ts";
 import { resend } from "./resend.ts";
 import { google } from "./google.ts";
 import { status } from "./status.ts";
+import { cloudflarePages } from "./cloudflare-pages.ts";
 
 type Route = [method: string, pattern: RegExp, body: unknown, status?: number];
 let routes: Route[] = [];
@@ -364,6 +365,111 @@ test("netlify: a changed bandwidth response is reported, not saved", async () =>
   const r = await runCollect(netlify, { site: "my.netlify.app" });
   assert.equal(r.ok, false);
   assert.match(r.error!, /needs an update/);
+});
+
+// ---- Cloudflare Pages
+const ok = (result: unknown) => ({ success: true, errors: [], result });
+const pagesDeploy = (id: string, o: { daysAgo?: number; env?: string; status?: string; trigger?: string; skipped?: boolean; msg?: string } = {}) => ({
+  id,
+  short_id: id,
+  environment: o.env ?? "production",
+  created_on: new Date(Date.now() - (o.daysAgo ?? 0) * 86400_000).toISOString(),
+  latest_stage: { name: "deploy", status: o.status ?? "success" },
+  deployment_trigger: { type: o.trigger ?? "github:push", metadata: { branch: "main", commit_message: o.msg ?? `Commit ${id}\nmore` } },
+  is_skipped: o.skipped ?? false,
+});
+const pagesRoutes = (extra: Route[] = []): Route[] => [
+  ...extra,
+  ["GET", /\/accounts\?per_page=50$/, ok([{ id: "acc1" }])],
+  ["GET", /\/accounts\/acc1\/pages\/projects\/my-site$/, ok({
+    name: "my-site", subdomain: "my-site.pages.dev", production_branch: "main", canonical_deployment: { id: "live", created_on: new Date().toISOString() },
+  })],
+  ["GET", /\/my-site\/deployments\?per_page=8$/, ok([
+    pagesDeploy("new", { status: "failure", msg: "Break things" }),
+    pagesDeploy("live"),
+    pagesDeploy("old"),
+    pagesDeploy("pr", { env: "preview" }),
+  ])],
+  ["GET", /\/my-site\/domains$/, ok([{ name: "site.com", status: "active" }, { name: "www.site.com", status: "pending" }])],
+  ["GET", /\/pages\/projects\?per_page=100$/, ok([{ name: "my-site" }, { name: "other" }])],
+  ["GET", /\/my-site\/deployments\?per_page=25&page=1$/, ok([
+    pagesDeploy("a"),
+    pagesDeploy("b", { trigger: "ad_hoc" }), // direct upload: no build
+    pagesDeploy("c", { skipped: true }), // skipped: no build
+    pagesDeploy("d", { daysAgo: 45 }), // an earlier month
+  ])],
+  ["GET", /\/other\/deployments\?per_page=25&page=1$/, ok([pagesDeploy("e", { env: "preview" })])],
+  ["POST", /\/graphql$/, { data: { viewer: { accounts: [{ pages: [{ sum: { requests: 1200 } }], workers: [{ sum: { requests: 300 } }] }] } } }],
+];
+
+test("cloudflare pages: status, deploys, builds, requests and domains", async () => {
+  routes = pagesRoutes();
+  const r = await runLoad(cloudflarePages, id(), { project: "https://my-site.pages.dev" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.equal(r.view!.status!.label, "Latest production deploy failed");
+  const stats = Object.fromEntries(r.view!.stats!.map((s) => [s.label, s]));
+  // Builds this month: a and e count; b is a direct upload, c was skipped, d is older.
+  assert.equal(stats["Builds this month"].value, "2 / 500");
+  // Pages Functions and Workers share the daily limit.
+  assert.equal(stats["Functions requests today"].value, "1,500 / 100,000");
+  const [deploys, domains] = r.view!.sections!;
+  assert.equal(deploys.items[0].title, "Break things");
+  assert.equal(deploys.items[0].actions![0].id, "retry");
+  assert.match(deploys.items[1].title, /^LIVE · Commit live/);
+  assert.equal(deploys.items[1].actions!.length, 0);
+  assert.equal(deploys.items[2].actions![0].id, "rollback");
+  assert.ok(deploys.items[2].actions![0].confirm);
+  assert.equal(deploys.items[3].actions!.length, 0); // previews can't be rolled back to
+  assert.deepEqual(domains.items.map((d) => d.tone), ["ok", "pending"]);
+  assert.deepEqual(r.view!.actions![0].args, { deploymentId: "live" });
+});
+
+test("cloudflare pages: works without the analytics permission, and warns when limits are used up", async () => {
+  routes = pagesRoutes([["POST", /\/graphql$/, { data: null, errors: [{ message: "authorization denied" }] }]]);
+  let r = await runLoad(cloudflarePages, id(), { project: "my-site", buildsLimit: 2 });
+  assert.ok(r.ok, r.error ?? "");
+  assert.equal(r.view!.stats!.find((s) => s.label.startsWith("Functions")), undefined);
+  assert.equal(r.view!.stats!.find((s) => s.label === "Builds this month")!.tone, "bad");
+  assert.match(r.view!.notice!, /builds are used up/);
+
+  routes = pagesRoutes([["POST", /\/graphql$/, { data: { viewer: { accounts: [{ pages: [{ sum: { requests: 100000 } }], workers: [] }] } } }]]);
+  r = await runLoad(cloudflarePages, id(), { project: "my-site" });
+  assert.match(r.view!.notice!, /requests are used up/);
+});
+
+test("cloudflare pages: finds the project's account, and explains a missing project", async () => {
+  routes = pagesRoutes([
+    ["GET", /\/accounts\?per_page=50$/, ok([{ id: "acc0" }, { id: "acc1" }])],
+    ["GET", /\/accounts\/acc0\/pages\/projects\/my-site$/, { success: false, errors: [{ message: "Project not found" }] }, 404],
+  ]);
+  assert.ok((await runLoad(cloudflarePages, id(), { project: "my-site" })).ok);
+
+  routes = pagesRoutes();
+  const r = await runLoad(cloudflarePages, id(), { project: "nope" });
+  assert.equal(r.ok, false);
+  assert.match(r.error!, /no Pages project named nope/);
+});
+
+test("cloudflare pages: retry and roll back call the right endpoints", async () => {
+  routes = pagesRoutes([["POST", /\/(retry|rollback)$/, ok({})]]);
+  assert.ok((await runAction(cloudflarePages, id(), { project: "my-site" }, "retry", { deploymentId: "new" })).ok);
+  assert.match(calls.at(-1)!.url, /\/accounts\/acc1\/pages\/projects\/my-site\/deployments\/new\/retry$/);
+  assert.ok((await runAction(cloudflarePages, id(), { project: "my-site" }, "rollback", { deploymentId: "old" })).ok);
+  assert.match(calls.at(-1)!.url, /\/deployments\/old\/rollback$/);
+  assert.equal(calls.at(-1)!.auth, "Bearer cf-test");
+});
+
+test("cloudflare pages: saves builds and requests for analytics", async () => {
+  routes = pagesRoutes();
+  const r = await runCollect(cloudflarePages, { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  const got = Object.fromEntries(r.points.map((p) => [p.metric, p.value]));
+  assert.deepEqual(got, {
+    "cloudflare.pages_builds_month": 2,
+    "cloudflare.pages_builds_month.limit": 500,
+    "cloudflare.functions_requests_today": 1500,
+    "cloudflare.functions_requests_today.limit": 100000,
+  });
 });
 
 // ---- Google and status (no tokens)
