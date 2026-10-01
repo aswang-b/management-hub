@@ -159,15 +159,14 @@ main { padding: 16px; }
   width: 100%; height: 100%; padding: 8px; text-decoration: none; text-align: left;
 }
 .link-tool.wide { justify-content: flex-start; padding: 8px 14px; }
-.link-tool:hover { background: var(--ink); color: var(--paper); }
-.link-tool:hover .link-icon { background: var(--paper); }
+/* Hover: the tile's outline turns bold (drawn inside the edge, so nothing moves); the tile stays white. */
+.tile-link:has(.link-tool:hover) { box-shadow: inset 0 0 0 2px var(--ink); }
 .link-tool.empty { color: var(--mid); font-size: 12px; text-align: center; }
 .link-icon { width: clamp(20px, 40cqh, 56px); height: clamp(20px, 40cqh, 56px); object-fit: contain; flex-shrink: 0; }
 .link-letter {
   width: clamp(20px, 40cqh, 56px); height: clamp(20px, 40cqh, 56px); font-size: clamp(11px, 18cqh, 26px); flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   border: var(--thin); font-weight: 800;
 }
-.link-tool:hover .link-letter { border-color: var(--paper); }
 .link-title { font-weight: 600; font-size: clamp(13px, 14cqh, 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- Notes module */
