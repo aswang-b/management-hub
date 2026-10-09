@@ -41,6 +41,10 @@ The React page. Built by Vite into `web/dist`, which the server serves.
 ## Patterns
 - Strict black/white, sharp corners. Status uses glyphs (● ▲ ■ ◐ ○) and
   inversion, never colors.
+- Anything with a hover cue needs a matching `:focus-visible` one, and an
+  outline under `@media (forced-colors: active)` (High Contrast drops
+  shadows). `.tile` clips overflow, so draw focus inside the edge. An
+  icon-only control needs an `aria-label`.
 - Grid width 4–12 squares (`GRID_WIDTH` in `shared/types.ts`).
 - Adding a new non-plugin tool type: a component in `tools/` plus an entry in
   `registry.tsx` with its sizes.
