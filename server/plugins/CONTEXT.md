@@ -16,7 +16,7 @@ One file per outside service. Each exports a `Plugin` (see `framework.ts`).
 - `collect(ctx)` (optional): numbers to save hourly for analytics, as
   `{ metric, value, tags? }`. Add a `<metric>.limit` point for a gauge.
   Used by `resend`, `netlify` (credits, or bandwidth on older plans) and
-  `vercel` (deploys in 24h; billed this month on Pro).
+  `vercel` (deploys in 24h, 30-day transfer/invocations/requests; billed this month on Pro).
 
 ## Helpers
 - `request(url, opts)`: HTTP with errors turned into plain-language messages.

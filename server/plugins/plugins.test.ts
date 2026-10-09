@@ -433,6 +433,72 @@ test("vercel: says plainly when usage isn't available on the plan", async () => 
   assert.match(r.view!.sections![1].items[0].title, /Not available through Vercel's API/);
 });
 
+// The shape /v2/usage returned for a real Hobby team (2026-10-09), one day per row.
+const usageDay = (o: Record<string, number> = {}) => ({
+  date: "2026-10-08T00:00:00.000Z", request_hit_count: 3, request_miss_count: 1, bandwidth_outgoing_bytes: 60e9, bandwidth_incoming_bytes: 10e9,
+  function_invocation_successful_count: 900, function_invocation_error_count: 50, function_invocation_timeout_count: 50, function_invocation_throttle_count: 7,
+  function_execution_successful_gb_hours: 1.5, function_execution_error_gb_hours: 0.5, function_execution_timeout_gb_hours: 0, ...o,
+});
+const hobbyRoutes = (days: object[]) => vercelRoutes({
+  billing: { error: { code: "costs_not_found", message: "Costs not found" } }, billingStatus: 404,
+  extra: [
+    ["GET", /\/v2\/usage\?type=requests&/, { granularity: "day", data: days }],
+    ["GET", /\/v2\/usage\?type=builds&/, { granularity: "day", data: [{ build_completed_count: 3, build_failed_count: 1, build_build_seconds: 150 }] }],
+  ],
+});
+
+test("vercel: shows Hobby usage for the last 30 days against the free allowances", async () => {
+  routes = hobbyRoutes([usageDay(), usageDay({ bandwidth_outgoing_bytes: 5e9, bandwidth_incoming_bytes: 0, request_hit_count: 0, request_miss_count: 0 })]);
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  const stats = Object.fromEntries(r.view!.stats!.map((s) => [s.label, s]));
+  // 60 + 10 + 5 GB of the 100 GB allowance; throttled calls aren't invocations.
+  assert.equal(stats["Data transfer (30d)"].value, "75 GB / 100 GB");
+  assert.deepEqual(stats["Data transfer (30d)"].limit, { used: 75e9, max: 100e9 });
+  assert.equal(stats["Data transfer (30d)"].tone, "ok");
+  assert.equal(stats["Function invocations (30d)"].value, "2,000 / 1,000,000");
+  assert.equal(stats["Function memory (30d)"].value, "4 GB-hrs / 360 GB-hrs");
+  assert.equal(stats["Billed this month"], undefined);
+  const usage = r.view!.sections![1];
+  assert.equal(usage.title, "Usage, last 30 days");
+  assert.deepEqual(usage.items.map((i) => i.title), ["4 requests", "4 builds", "Active CPU and origin transfer: not reported"]);
+  assert.equal(usage.items[0].subtitle, "75% served from cache");
+  assert.equal(usage.items[1].subtitle, "2.5 minutes building");
+  assert.equal(r.view!.notice, undefined);
+});
+
+test("vercel: warns when a free allowance is used up", async () => {
+  routes = hobbyRoutes([usageDay({ bandwidth_outgoing_bytes: 101e9 })]);
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.equal(r.view!.stats!.find((s) => s.label === "Data transfer (30d)")!.tone, "bad");
+  assert.match(r.view!.notice!, /over a free-plan allowance/);
+});
+
+test("vercel: on Pro, usage is shown without the free-plan limits", async () => {
+  routes = vercelRoutes({ extra: [["GET", /\/v2\/usage\?type=requests&/, { data: [usageDay()] }]] });
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  const transfer = r.view!.stats!.find((s) => s.label === "Data transfer (30d)")!;
+  assert.equal(transfer.value, "70 GB");
+  assert.equal(transfer.limit, undefined);
+  assert.equal(r.view!.sections![1].title, "Charges this month");
+});
+
+test("vercel: saves Hobby usage for analytics", async () => {
+  routes = hobbyRoutes([usageDay()]);
+  const r = await runCollect(vercel, { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  const got = Object.fromEntries(r.points.map((p) => [p.metric, p.value]));
+  assert.deepEqual(got, {
+    "vercel.deploys_24h": 3,
+    "vercel.deploys_24h.limit": 100,
+    "vercel.transfer_30d_bytes": 70e9,
+    "vercel.transfer_30d_bytes.limit": 100e9,
+    "vercel.invocations_30d": 1000,
+    "vercel.invocations_30d.limit": 1_000_000,
+    "vercel.requests_30d": 4,
+  });
+});
+
 test("vercel: a paused project offers Resume, and the deploy limit warns", async () => {
   routes = vercelRoutes({ paused: true });
   const r = await runLoad(vercel, id(), { project: "my-site", deploysPerDay: 3 });

@@ -3,7 +3,7 @@
 // and redeploy / roll back / cancel / resume / verify buttons.
 // API docs: https://vercel.com/docs/rest-api
 // Limits: https://vercel.com/docs/limits
-import { ago, expectShape, num, optional, request, type Plugin, type PluginContext } from "./framework.ts";
+import { ago, bytes, expectShape, num, optional, request, type Plugin, type PluginContext } from "./framework.ts";
 import type { PluginItem, Tone } from "../../shared/types.ts";
 
 const API = "https://api.vercel.com";
@@ -89,7 +89,47 @@ async function usageThisMonth(ctx: PluginContext, teamQuery: string) {
   return summarizeCharges(String(text ?? ""));
 }
 
+// Hobby allowances per rolling 30 days (https://vercel.com/docs/limits/fair-use-guidelines).
+export const HOBBY = { transferBytes: 100e9, invocations: 1_000_000, memoryGbHours: 360 };
+
+export interface Usage30d {
+  transferBytes: number;
+  invocations: number;
+  memoryGbHours: number;
+  requests: number;
+  cacheHits: number;
+  builds: number;
+  buildSeconds: number;
+}
+
+/**
+ * Team usage over the last 30 days from /v2/usage. Not in Vercel's published
+ * docs (checked 2026-10-09), but it answers Hobby teams, unlike the billing
+ * API. Active CPU and Fast Origin Transfer aren't in it.
+ */
+async function usage30d(ctx: PluginContext, teamQuery: string): Promise<Usage30d> {
+  const to = new Date();
+  const range = `from=${encodeURIComponent(new Date(to.getTime() - 30 * 86400_000).toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
+  const [req, builds] = await Promise.all([
+    vc(ctx, `/v2/usage?type=requests&${range}`, teamQuery),
+    optional(vc(ctx, `/v2/usage?type=builds&${range}`, teamQuery)),
+  ]);
+  expectShape(Array.isArray(req?.data), "Vercel", "usage");
+  const sum = (rows: any[] | undefined, ...keys: string[]) =>
+    (rows ?? []).reduce((s, r) => s + keys.reduce((k, key) => k + (Number(r?.[key]) || 0), 0), 0);
+  return {
+    transferBytes: sum(req.data, "bandwidth_outgoing_bytes", "bandwidth_incoming_bytes"),
+    invocations: sum(req.data, "function_invocation_successful_count", "function_invocation_error_count", "function_invocation_timeout_count"),
+    memoryGbHours: sum(req.data, "function_execution_successful_gb_hours", "function_execution_error_gb_hours", "function_execution_timeout_gb_hours"),
+    requests: sum(req.data, "request_hit_count", "request_miss_count"),
+    cacheHits: sum(req.data, "request_hit_count"),
+    builds: sum(builds?.data, "build_completed_count", "build_failed_count"),
+    buildSeconds: sum(builds?.data, "build_build_seconds"),
+  };
+}
+
 const usd = (n: number) => `$${n.toFixed(2)}`;
+const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`;
 const qty = (n: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: n < 10 ? 2 : 0 }).format(n);
 
 export const vercel: Plugin = {
@@ -120,11 +160,12 @@ export const vercel: Plugin = {
   async load(ctx) {
     const tq = await team(ctx);
     const p = await project(ctx, tq);
-    const [list, domains, deploys24h, usage] = await Promise.all([
+    const [list, domains, deploys24h, usage, u30] = await Promise.all([
       vc(ctx, `/v7/deployments?projectId=${p.id}&limit=8`, tq),
       optional(vc(ctx, `/v9/projects/${p.id}/domains`, tq)),
       optional(deploysLast24h(ctx, tq)),
       optional(usageThisMonth(ctx, tq)),
+      optional(usage30d(ctx, tq)),
     ]);
     expectShape(Array.isArray(list?.deployments), "Vercel", "deployment list");
     const deployments: any[] = list.deployments;
@@ -178,26 +219,57 @@ export const vercel: Plugin = {
       actions: d.verified ? [] : [{ id: "verifyDomain", label: "Verify", args: { domain: d.name } }],
     }));
 
+    // Billing data only exists for Pro/Enterprise; without it, the Hobby allowances apply.
+    const hobby = !usage;
+    const gauge = (label: string, used: number, max: number, show: (n: number) => string) => {
+      const tone: Tone = used >= max ? "bad" : used / max > 0.8 ? "warn" : "ok";
+      return hobby
+        ? { label, value: `${show(used)} / ${show(max)}`, tone, limit: { used, max } }
+        : { label, value: show(used) };
+    };
+    const usageStats = u30
+      ? [
+          gauge("Data transfer (30d)", u30.transferBytes, HOBBY.transferBytes, bytes),
+          gauge("Function invocations (30d)", u30.invocations, HOBBY.invocations, num),
+          gauge("Function memory (30d)", u30.memoryGbHours, HOBBY.memoryGbHours, (n) => `${qty(n)} GB-hrs`),
+        ]
+      : [];
+    const overHobby = hobby && u30 && usageStats.some((s) => s.tone === "bad");
+
     const usageSection = usage
       ? {
-          title: "Usage this month",
+          title: "Charges this month",
           items: usage.lines.slice(0, 8).map((l) => ({ title: `${l.service}: ${qty(l.quantity)} ${l.unit}`.trim(), subtitle: `${usd(l.cost)} billed` })),
           empty: "No usage charged yet this month.",
         }
-      : {
-          title: "Usage this month",
-          items: [
-            {
-              title: "Not available through Vercel's API on this plan",
-              subtitle: "Vercel only shares usage data with Pro and Enterprise teams. The Usage page shows it. Free plan: 100 GB data transfer, 1M function invocations, 4 hours active CPU a month.",
-              url: usageUrl,
-            },
-          ],
-        };
+      : u30
+        ? {
+            title: "Usage, last 30 days",
+            items: [
+              { title: plural(u30.requests, "request"), subtitle: u30.requests ? `${Math.round((u30.cacheHits / u30.requests) * 100)}% served from cache` : "No traffic yet" },
+              { title: plural(u30.builds, "build"), subtitle: `${qty(u30.buildSeconds / 60)} minutes building` },
+              {
+                title: "Active CPU and origin transfer: not reported",
+                subtitle: "Vercel's API doesn't share these (free plan: 4 hours active CPU, 10 GB origin transfer). The Usage page shows them.",
+                url: usageUrl,
+              },
+            ],
+          }
+        : {
+            title: "Usage",
+            items: [
+              {
+                title: "Not available through Vercel's API right now",
+                subtitle: "The Usage page shows it. Free plan: 100 GB data transfer, 1M function invocations, 4 hours active CPU per 30 days.",
+                url: usageUrl,
+              },
+            ],
+          };
 
     const notices = [
       p.paused ? "Vercel has paused this project, so the site is offline. On the free plan this happens when a usage limit is exceeded. Resume it when you're ready." : "",
       deploys24h !== undefined && deploys24h >= deploysMax ? "The daily deploy limit is used up: new deploys will fail until older ones are more than 24 hours old." : "",
+      overHobby && !p.paused ? "This team is over a free-plan allowance for the last 30 days. Vercel may pause the project until usage drops back under it." : "",
     ].filter(Boolean);
 
     return {
@@ -209,6 +281,7 @@ export const vercel: Plugin = {
         ...(deploys24h !== undefined
           ? [{ label: "Deploys (24h)", value: `${num(deploys24h)} / ${num(deploysMax)}`, tone: deployTone, limit: { used: deploys24h, max: deploysMax } }]
           : []),
+        ...usageStats,
         ...(usage ? [{ label: "Billed this month", value: usd(usage.total) }] : []),
       ],
       sections: [
@@ -231,12 +304,23 @@ export const vercel: Plugin = {
   // Saved every hour for analytics tiles.
   async collect(ctx) {
     const tq = await team(ctx);
-    const [deploys, usage] = await Promise.all([deploysLast24h(ctx, tq), optional(usageThisMonth(ctx, tq))]);
+    const [deploys, usage, u30] = await Promise.all([deploysLast24h(ctx, tq), optional(usageThisMonth(ctx, tq)), optional(usage30d(ctx, tq))]);
     const tags = { team: tq ? decodeURIComponent(tq.split("=")[1]) : "personal" };
+    // Hobby limits only apply without billing data (see `load`).
+    const limit = (metric: string, value: number) => (usage ? [] : [{ metric: `${metric}.limit`, value, tags }]);
     return [
       { metric: "vercel.deploys_24h", value: deploys, tags },
       { metric: "vercel.deploys_24h.limit", value: Number(ctx.config.deploysPerDay) || DEFAULT_DEPLOYS_PER_DAY, tags },
       ...(usage ? [{ metric: "vercel.billed_usd_month", value: Math.round(usage.total * 100) / 100, tags }] : []),
+      ...(u30
+        ? [
+            { metric: "vercel.transfer_30d_bytes", value: u30.transferBytes, tags },
+            ...limit("vercel.transfer_30d_bytes", HOBBY.transferBytes),
+            { metric: "vercel.invocations_30d", value: u30.invocations, tags },
+            ...limit("vercel.invocations_30d", HOBBY.invocations),
+            { metric: "vercel.requests_30d", value: u30.requests, tags },
+          ]
+        : []),
     ];
   },
 
