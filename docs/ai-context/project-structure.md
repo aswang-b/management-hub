@@ -15,6 +15,7 @@
 | `npm run serve` | Serve without rebuilding |
 | `npm run typecheck` / `npm test` / `npm run build` | Checks before committing |
 | `npm run check-plugins` | Run every plugin against the real services |
+| `npm run app:install` / `app:restart` / `app:stop` / `app:status` / `app:uninstall` | Background Windows app: a hidden task started at sign-in (`scripts/windows-app.ps1`) |
 
 ## File tree
 ```
@@ -33,11 +34,14 @@ server/
     <service>.ts        one per service (current list: server/plugins/CONTEXT.md)
     plugins.test.ts     tests for every plugin and action
   *.test.ts             metrics, db (restore), secrets, grid placement
+scripts/
+  windows-app.ps1       npm run app:*: registers/starts/stops the "Management Hub" Windows task
+  run-hidden.cmd        what the task runs (under conhost --headless): server, output to data/hub.log
 shared/                 used by server and page (see shared/CONTEXT.md)
   types.ts              Project, Tool, PluginView, grid helpers (makeRoom, refit)
   metrics.ts            analytics types, ranges, value formatting
 web/
-  index.html, public/   page shell, icon, PWA manifest
+  index.html, public/   page shell, icons (SVG + PNG for app installs), PWA manifest
   src/
     App.tsx             project switcher, builder-mode toggle, Undo/Redo/Revert, Tokens
     useUndo.ts          builder-mode history (snapshots restored on the server)

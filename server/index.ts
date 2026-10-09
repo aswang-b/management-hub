@@ -158,7 +158,13 @@ app.get("*", serveStatic({ path: "./web/dist/index.html" }));
 
 const port = Number(process.env.HUB_PORT) || 8787;
 const hostname = process.env.HUB_HOST || "127.0.0.1";
-serve({ fetch: app.fetch, port, hostname }, () => {
+const server = serve({ fetch: app.fetch, port, hostname }, () => {
   console.log(`Management hub running at http://localhost:${port}`);
+});
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code !== "EADDRINUSE") throw err;
+  console.error(`Port ${port} is already in use: the hub is probably already running (for example as the background app).`);
+  console.error("Open http://localhost:" + port + ", or use 'npm run app:restart' to restart it with your latest changes.");
+  process.exit(1);
 });
 startCollector();

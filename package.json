@@ -7,6 +7,11 @@
     "build": "vite build",
     "start": "vite build && tsx --no-warnings=ExperimentalWarning server/index.ts",
     "serve": "tsx --no-warnings=ExperimentalWarning server/index.ts",
+    "app:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-app.ps1 install",
+    "app:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-app.ps1 restart",
+    "app:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-app.ps1 stop",
+    "app:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-app.ps1 status",
+    "app:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows-app.ps1 uninstall",
     "typecheck": "tsc",
     "check-plugins": "tsx --no-warnings=ExperimentalWarning server/check-plugins.ts",
     "test": "node --import tsx --test \"server/**/*.test.ts\""

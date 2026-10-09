@@ -99,6 +99,30 @@ npm start
 
 Then open <http://localhost:8787>.
 
+## Running it as a Windows app
+
+Instead of keeping a terminal open with `npm start`, the hub can run quietly
+in the background and open in its own window like any other app:
+
+1. In the hub folder, run `npm run app:install`. From now on the hub starts
+   by itself, hidden, whenever you sign in to Windows.
+2. Open <http://localhost:8787> in Microsoft Edge, then choose **⋯ → Apps →
+   Install this site as an app** (in Chrome: the install icon at the right of
+   the address bar). The hub gets its own window, a Start menu entry, and can
+   be pinned to the taskbar.
+
+| Command | What it does |
+|---|---|
+| `npm run app:install` | Start the hub now and every time you sign in |
+| `npm run app:restart` | Rebuild the page and restart the hub, e.g. after updating the code |
+| `npm run app:stop` | Stop it until you next sign in (or restart it) |
+| `npm run app:status` | Say whether it's installed and running |
+| `npm run app:uninstall` | Stop it and stop starting it at sign-in |
+
+If the hub doesn't open, `data/hub.log` holds what it printed (the run
+before is in `data/hub.previous.log`). While the background app runs,
+`npm start` says the port is in use: use `npm run app:restart` instead.
+
 **Tokens** let plugins reach your services. Press **Tokens** in the top bar
 (or **Add token** on a plugin tile that needs one): each token has
 step-by-step instructions for getting it from the service, a link to the
@@ -113,16 +137,27 @@ back up the hub.
 
 ## Using it from your phone
 
-The page adapts to phone screens (builder mode needs a larger screen). To reach
-the hub from your phone privately:
+The page adapts to phone screens (builder mode needs a larger screen). Your
+phone reaches the hub through [Tailscale](https://tailscale.com), a free app
+that links your own devices into a private network. Nothing is put on the
+public internet, and nobody else on your Wi-Fi can open the hub.
 
-1. Install [Tailscale](https://tailscale.com) on your computer and phone and
-   sign in to both with the same account.
-2. On the computer, run `tailscale serve --bg 8787`. It prints a private
-   `https://…ts.net` address that only your devices can open.
-3. Open that address on your phone and choose **Add to Home Screen**.
+1. Install Tailscale on your computer and phone and sign in to both with the
+   same account.
+2. In the [Tailscale admin page](https://login.tailscale.com/admin/dns), turn
+   on **MagicDNS** and **HTTPS Certificates** (needed for the private
+   `https://` address).
+3. On the computer, run `tailscale serve --bg 8787`. It prints a private
+   `https://…ts.net` address that only your devices can open. It keeps
+   working after a restart; `tailscale serve reset` turns it off.
+4. Open that address in your phone's browser (Tailscale switched on) and add
+   it to your home screen: **Share → Add to Home Screen** on iPhone (Safari),
+   **⋮ → Add to Home screen / Install app** on Android (Chrome). It then opens
+   full screen with the hub icon.
 
-Your computer needs to be on for the phone to reach it.
+Your computer needs to be on (and the hub running, see
+[Running it as a Windows app](#running-it-as-a-windows-app)) for the phone to
+reach it.
 
 ## Commands
 
