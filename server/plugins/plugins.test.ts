@@ -11,7 +11,7 @@ import { cloudflare } from "./cloudflare.ts";
 import { resend } from "./resend.ts";
 import { google } from "./google.ts";
 import { status } from "./status.ts";
-import { vercel } from "./vercel.ts";
+import { forgetVercelTeams, summarizeCharges, vercel } from "./vercel.ts";
 
 type Route = [method: string, pattern: RegExp, body: unknown, status?: number];
 let routes: Route[] = [];
@@ -29,6 +29,7 @@ beforeEach(() => {
   process.env.CLOUDFLARE_API_TOKEN = "cf-test";
   process.env.RESEND_API_KEY = "rs-test";
   process.env.VERCEL_TOKEN = "vc-test";
+  forgetVercelTeams();
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
@@ -389,7 +390,7 @@ const vercelRoutes = (o: { paused?: boolean; extra?: Route[]; billing?: unknown;
   ...(o.extra ?? []),
   ["GET", /\/v2\/user$/, { user: { defaultTeamId: "team_1" } }],
   ["GET", /\/v9\/projects\/my-site\?teamId=team_1$/, {
-    id: "prj_1", name: "my-site", paused: o.paused ?? false, link: { productionBranch: "main" },
+    id: "prj_1", accountId: "team_1", name: "my-site", paused: o.paused ?? false, link: { productionBranch: "main" },
     targets: { production: { id: "live", url: "live.vercel.app", alias: ["site.com"], createdAt: Date.now() - 3600_000 } },
   }],
   ["GET", /\/v7\/deployments\?projectId=prj_1&limit=8&teamId=team_1$/, { deployments: [
@@ -419,9 +420,12 @@ test("vercel: status, deploys with actions, deploy limit, usage and domains", as
   assert.equal(deploys.items[2].actions![0].id, "rollback");
   assert.ok(deploys.items[2].actions![0].confirm);
   assert.equal(deploys.items[3].actions!.length, 0); // previews aren't rollback targets
-  assert.deepEqual(usage.items.map((i) => i.title), ["Function Invocations: 250,000 invocations", "Fast Data Transfer: 15 GB"]);
+  // The credit is listed too, so the lines add up to "Billed this month".
+  assert.deepEqual(usage.items.map((i) => i.title), ["Function Invocations: 250,000 invocations", "Fast Data Transfer: 15 GB", "Plan fees, credits and tax"]);
+  assert.equal(usage.items[2].subtitle, "-$1.50 billed");
   assert.equal(domains.items[1].actions![0].id, "verifyDomain");
   assert.deepEqual(r.view!.actions!.map((a) => a.id), ["redeploy"]);
+  assert.ok(r.view!.actions![0].confirm); // it publishes, so it asks first
   assert.equal(r.view!.links!.find((l) => l.label === "Usage")!.url, "https://vercel.com/alex/~/usage");
 });
 
@@ -519,9 +523,10 @@ test("vercel: uses the team from settings instead of the default", async () => {
 });
 
 test("vercel: buttons call the right endpoints", async () => {
-  routes = vercelRoutes({ extra: [["POST", /./, {}], ["PATCH", /./, {}]] });
+  routes = vercelRoutes({ extra: [["GET", /\/v13\/deployments\/(old|new)\?/, { projectId: "prj_1" }], ["POST", /./, {}], ["PATCH", /./, {}]] });
   const cfg = { project: "my-site" };
-  assert.ok((await runAction(vercel, id(), cfg, "redeploy", { deploymentId: "live" })).ok);
+  // Redeploy rebuilds what's live, whatever the request says.
+  assert.ok((await runAction(vercel, id(), cfg, "redeploy", { deploymentId: "other" })).ok);
   let c = calls.at(-1)!;
   assert.match(c.url, /\/v13\/deployments\?forceNew=1&teamId=team_1$/);
   assert.deepEqual(c.body, { name: "my-site", project: "prj_1", deploymentId: "live", target: "production" });
@@ -536,6 +541,70 @@ test("vercel: buttons call the right endpoints", async () => {
   assert.match(calls.at(-1)!.url, /\/v1\/projects\/prj_1\/unpause\?teamId=team_1$/);
   assert.ok((await runAction(vercel, id(), cfg, "verifyDomain", { domain: "www.site.com" })).ok);
   assert.match(calls.at(-1)!.url, /\/v9\/projects\/prj_1\/domains\/www\.site\.com\/verify\?teamId=team_1$/);
+});
+
+test("vercel: buttons refuse deploys from another project", async () => {
+  routes = vercelRoutes({ extra: [["GET", /\/v13\/deployments\/dpl_x\?/, { projectId: "prj_other" }], ["POST", /./, {}], ["PATCH", /./, {}]] });
+  const cfg = { project: "my-site" };
+  for (const action of ["cancel", "rollback"]) {
+    const r = await runAction(vercel, id(), cfg, action, { deploymentId: "dpl_x" });
+    assert.equal(r.ok, false);
+    assert.match((r as { error?: string }).error!, /different project/);
+  }
+  assert.ok(!calls.some((c) => c.method !== "GET"));
+});
+
+test("vercel: counts every deploy of the last 24 hours, across pages", async () => {
+  const page = (n: number, prefix: string) => Array.from({ length: n }, (_, i) => vDeploy(`${prefix}${i}`));
+  routes = vercelRoutes({ extra: [
+    ["GET", /\/v7\/deployments\?limit=100&since=\d+&until=500&teamId=team_1$/, { deployments: page(50, "b"), pagination: { next: null } }],
+    ["GET", /\/v7\/deployments\?limit=100&since=\d+&teamId=team_1$/, { deployments: page(100, "a"), pagination: { next: 500 } }],
+  ] });
+  const r = await runLoad(vercel, id(), { project: "my-site", deploysPerDay: "6000" });
+  assert.equal(r.view!.stats!.find((s) => s.label === "Deploys (24h)")!.value, "150 / 6,000");
+  // With a limit of 100 it stops at the first full page and says there may be more.
+  const capped = await runLoad(vercel, id(), { project: "my-site" });
+  assert.equal(capped.view!.stats!.find((s) => s.label === "Deploys (24h)")!.value, "100+ / 100");
+});
+
+test("vercel: a failed billing call doesn't make a Pro team look like Hobby", async () => {
+  routes = vercelRoutes({ billing: { error: { message: "busy" } }, billingStatus: 500, extra: [["GET", /\/v2\/usage\?type=requests&/, { data: [usageDay({ bandwidth_outgoing_bytes: 200e9 })] }]] });
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  const transfer = r.view!.stats!.find((s) => s.label === "Data transfer (30d)")!;
+  assert.equal(transfer.limit, undefined);
+  assert.equal(r.view!.notice, undefined);
+  const c = await runCollect(vercel, { project: "my-site" });
+  assert.ok(!c.points.some((p) => p.metric.startsWith("vercel.transfer_30d_bytes.limit")));
+});
+
+test("vercel: a billing file with a bad row keeps the rest", () => {
+  const s = summarizeCharges(`${charges}\nnot json`);
+  assert.equal(s.lines.length, 2);
+  assert.equal(s.other, -1.5);
+});
+
+test("vercel: if the account lookup fails, it says so instead of guessing", async () => {
+  routes = vercelRoutes({ extra: [["GET", /\/v2\/user$/, { message: "busy" }, 500]] });
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.equal(r.ok, false);
+  assert.match(r.error!, /returned an error \(500\)/);
+  assert.ok(!calls.some((c) => c.url.includes("/v9/projects/")));
+});
+
+test("vercel: remembers the default team between refreshes", async () => {
+  routes = vercelRoutes();
+  await runLoad(vercel, id(), { project: "my-site" });
+  await runLoad(vercel, id(), { project: "my-site" });
+  assert.equal(calls.filter((c) => c.url.endsWith("/v2/user")).length, 1);
+});
+
+test("vercel: a project with no deploys has no broken Deployments link", async () => {
+  routes = vercelRoutes({ extra: [["GET", /\/v7\/deployments\?projectId=prj_1&/, { deployments: [] }]] });
+  const r = await runLoad(vercel, id(), { project: "my-site" });
+  assert.ok(r.ok, r.error ?? "");
+  assert.equal(r.view!.links!.find((l) => l.label === "Deployments"), undefined);
+  assert.equal(r.view!.links!.find((l) => l.label === "Usage")!.url, "https://vercel.com/dashboard");
 });
 
 test("vercel: saves deploys and charges for analytics", async () => {

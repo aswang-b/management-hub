@@ -3,22 +3,38 @@
 // and redeploy / roll back / cancel / resume / verify buttons.
 // API docs: https://vercel.com/docs/rest-api
 // Limits: https://vercel.com/docs/limits
-import { ago, bytes, expectShape, num, optional, request, type Plugin, type PluginContext } from "./framework.ts";
+import { ago, bytes, expectShape, num, optional, PluginError, request, type Plugin, type PluginContext } from "./framework.ts";
 import type { PluginItem, Tone } from "../../shared/types.ts";
 
 const API = "https://api.vercel.com";
 // Hobby: 100 deployments a day (rolling 24 hours). Change it in settings on Pro.
 const DEFAULT_DEPLOYS_PER_DAY = 100;
 
+// The token owner's default team, remembered for an hour per token so each
+// refresh and button press doesn't look it up again.
+const defaultTeams = new Map<string, { teamId: string; at: number }>();
+/** Clears the remembered default teams (used by tests). */
+export function forgetVercelTeams() {
+  defaultTeams.clear();
+}
+
 /** The team to act on: the tile's setting, or the token owner's default team. */
 async function team(ctx: PluginContext): Promise<string> {
   const t = ctx.config.team?.trim();
   if (t) return t.startsWith("team_") ? `teamId=${encodeURIComponent(t)}` : `slug=${encodeURIComponent(t)}`;
-  const me = await optional(vc(ctx, "/v2/user", ""));
-  return me?.user?.defaultTeamId ? `teamId=${encodeURIComponent(me.user.defaultTeamId)}` : "";
+  const token = ctx.secret("VERCEL_TOKEN");
+  let known = defaultTeams.get(token);
+  if (!known || Date.now() - known.at > 3600_000) {
+    // Not optional: if this fails, guessing the personal scope would look in the wrong place.
+    const me = await vc(ctx, "/v2/user", "");
+    expectShape(me?.user, "Vercel", "account details");
+    known = { teamId: String(me.user.defaultTeamId ?? ""), at: Date.now() };
+    defaultTeams.set(token, known);
+  }
+  return known.teamId ? `teamId=${encodeURIComponent(known.teamId)}` : "";
 }
 
-function vc<T = any>(ctx: PluginContext, path: string, teamQuery: string, init: { method?: string; body?: unknown; text?: boolean } = {}) {
+function vc<T = any>(ctx: PluginContext, path: string, teamQuery: string, init: { method?: string; body?: unknown; text?: boolean; allow?: number[] } = {}) {
   const sep = path.includes("?") ? "&" : "?";
   return request<T>(`${API}${path}${teamQuery ? sep + teamQuery : ""}`, {
     ...init,
@@ -47,11 +63,30 @@ function stateTone(state: string | undefined): Tone {
   return "neutral";
 }
 
-/** Deploys created in the last 24 hours across the team (the daily limit is a rolling window). */
-async function deploysLast24h(ctx: PluginContext, teamQuery: string): Promise<number> {
-  const res = await vc(ctx, `/v7/deployments?limit=100&since=${Date.now() - 86400_000}`, teamQuery);
-  expectShape(Array.isArray(res?.deployments), "Vercel", "deployment list");
-  return res.deployments.length;
+/** Throws unless the deploy belongs to this tile's project, so buttons can't act on another project. */
+async function ownDeployment(ctx: PluginContext, teamQuery: string, projectId: string, deploymentId: unknown) {
+  const d = await vc(ctx, `/v13/deployments/${encodeURIComponent(String(deploymentId))}`, teamQuery);
+  if (d?.projectId !== projectId) throw new PluginError("other", "That deploy belongs to a different project, so the hub left it alone.");
+}
+
+/**
+ * Deploys created in the last 24 hours across the team (the daily limit is a
+ * rolling window). Pages through the list and stops once the limit is
+ * reached; `more` is true when there may be more than `count`.
+ */
+async function deploysLast24h(ctx: PluginContext, teamQuery: string, max: number): Promise<{ count: number; more: boolean }> {
+  const since = Date.now() - 86400_000;
+  let count = 0;
+  let until: number | undefined;
+  for (let page = 0; page < 100; page++) {
+    const res = await vc(ctx, `/v7/deployments?limit=100&since=${since}${until ? `&until=${until}` : ""}`, teamQuery);
+    expectShape(Array.isArray(res?.deployments), "Vercel", "deployment list");
+    count += res.deployments.length;
+    until = res.pagination?.next ?? undefined;
+    if (!until || !res.deployments.length) return { count, more: false };
+    if (count >= max) break;
+  }
+  return { count, more: true };
 }
 
 export interface UsageLine {
@@ -61,32 +96,52 @@ export interface UsageLine {
   cost: number;
 }
 
-/** Sums FOCUS billing rows (JSON Lines) by service. */
-export function summarizeCharges(jsonl: string): { lines: UsageLine[]; total: number } {
+/**
+ * Sums FOCUS billing rows (JSON Lines) by service. `other` is what isn't usage
+ * (plan fees, credits, tax), so the lines plus `other` add up to `total`.
+ * A row that can't be read is skipped instead of losing the whole month.
+ */
+export function summarizeCharges(jsonl: string): { lines: UsageLine[]; total: number; other: number } {
   const by = new Map<string, UsageLine>();
   let total = 0;
+  let other = 0;
   for (const raw of jsonl.split("\n")) {
     if (!raw.trim()) continue;
-    const row = JSON.parse(raw);
-    const cost = Number(row.BilledCost) || 0;
+    let row: any;
+    try {
+      row = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const cost = Number(row?.BilledCost) || 0;
     total += cost;
-    if (row.ChargeCategory && row.ChargeCategory !== "Usage") continue;
+    if (row?.ChargeCategory && row.ChargeCategory !== "Usage") {
+      other += cost;
+      continue;
+    }
     const key = `${row.ServiceName}|${row.ConsumedUnit ?? ""}`;
     const line = by.get(key) ?? { service: String(row.ServiceName ?? "Other"), quantity: 0, unit: String(row.ConsumedUnit ?? ""), cost: 0 };
     line.quantity += Number(row.ConsumedQuantity) || 0;
     line.cost += cost;
     by.set(key, line);
   }
-  return { lines: [...by.values()].sort((a, b) => b.cost - a.cost || b.quantity - a.quantity), total };
+  return { lines: [...by.values()].sort((a, b) => b.cost - a.cost || b.quantity - a.quantity), total, other };
 }
 
-/** This month's usage charges. Undefined when Vercel doesn't share them (Hobby teams). */
+/**
+ * This month's usage charges. Null when Vercel says it has none (404
+ * `costs_not_found`, which is what Hobby teams get). Any other failure
+ * throws, so a Pro team isn't mistaken for Hobby when the call fails.
+ */
 async function usageThisMonth(ctx: PluginContext, teamQuery: string) {
   const now = new Date();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
   const to = new Date(now.getTime() + 86400_000).toISOString();
-  const text = await vc<string>(ctx, `/v1/billing/charges?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, teamQuery, { text: true });
-  return summarizeCharges(String(text ?? ""));
+  const text = await vc<string | null>(ctx, `/v1/billing/charges?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, teamQuery, {
+    text: true,
+    allow: [404],
+  });
+  return text === null ? null : summarizeCharges(text);
 }
 
 // Hobby allowances per rolling 30 days (https://vercel.com/docs/limits/fair-use-guidelines).
@@ -128,7 +183,7 @@ async function usage30d(ctx: PluginContext, teamQuery: string): Promise<Usage30d
   };
 }
 
-const usd = (n: number) => `$${n.toFixed(2)}`;
+const usd = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`;
 const qty = (n: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: n < 10 ? 2 : 0 }).format(n);
 
@@ -160,20 +215,24 @@ export const vercel: Plugin = {
   async load(ctx) {
     const tq = await team(ctx);
     const p = await project(ctx, tq);
-    const [list, domains, deploys24h, usage, u30] = await Promise.all([
+    const deploysMax = Number(ctx.config.deploysPerDay) || DEFAULT_DEPLOYS_PER_DAY;
+    const [list, domains, d24, usage, u30] = await Promise.all([
       vc(ctx, `/v7/deployments?projectId=${p.id}&limit=8`, tq),
       optional(vc(ctx, `/v9/projects/${p.id}/domains`, tq)),
-      optional(deploysLast24h(ctx, tq)),
+      optional(deploysLast24h(ctx, tq, deploysMax)),
       optional(usageThisMonth(ctx, tq)),
       optional(usage30d(ctx, tq)),
     ]);
     expectShape(Array.isArray(list?.deployments), "Vercel", "deployment list");
     const deployments: any[] = list.deployments;
+    const deploys24h = d24?.count;
 
     const live = p.targets?.production;
     // Dashboard links: a deploy's inspector URL is vercel.com/<team>/<project>/<id>.
-    const projectUrl = String(deployments[0]?.inspectorUrl ?? "").replace(/\/[^/]+$/, "") || "https://vercel.com/dashboard";
-    const usageUrl = /^https:\/\/vercel\.com\/[^/]+\/[^/]+$/.test(projectUrl) ? `${projectUrl.split("/").slice(0, 4).join("/")}/~/usage` : "https://vercel.com/dashboard";
+    // Before the first deploy it's unknown, so the Deployments link is left out.
+    const projectUrl = String(deployments[0]?.inspectorUrl ?? "").replace(/\/[^/]+$/, "");
+    const knownUrl = /^https:\/\/vercel\.com\/[^/]+\/[^/]+$/.test(projectUrl);
+    const usageUrl = knownUrl ? `${projectUrl.split("/").slice(0, 4).join("/")}/~/usage` : "https://vercel.com/dashboard";
     const items: PluginItem[] = deployments.map((d) => {
       const isLive = d.uid === live?.id;
       const state = d.readyState ?? d.state;
@@ -207,7 +266,6 @@ export const vercel: Plugin = {
             ? { label: "Live", tone: "ok" as Tone }
             : { label: `Deploying (${String(prodState).toLowerCase()})`, tone: "pending" as Tone };
 
-    const deploysMax = Number(ctx.config.deploysPerDay) || DEFAULT_DEPLOYS_PER_DAY;
     const deployTone: Tone = deploys24h === undefined ? "neutral" : deploys24h >= deploysMax ? "bad" : deploys24h / deploysMax > 0.8 ? "warn" : "ok";
 
     const domainList: any[] = Array.isArray(domains?.domains) ? domains.domains : [];
@@ -219,8 +277,9 @@ export const vercel: Plugin = {
       actions: d.verified ? [] : [{ id: "verifyDomain", label: "Verify", args: { domain: d.name } }],
     }));
 
-    // Billing data only exists for Pro/Enterprise; without it, the Hobby allowances apply.
-    const hobby = !usage;
+    // Vercel only has billing data for Pro/Enterprise: none (null) means Hobby, so its allowances
+    // apply. If the billing call failed (undefined) the plan is unknown, and no limits are shown.
+    const hobby = usage === null;
     const gauge = (label: string, used: number, max: number, show: (n: number) => string) => {
       const tone: Tone = used >= max ? "bad" : used / max > 0.8 ? "warn" : "ok";
       return hobby
@@ -239,7 +298,10 @@ export const vercel: Plugin = {
     const usageSection = usage
       ? {
           title: "Charges this month",
-          items: usage.lines.slice(0, 8).map((l) => ({ title: `${l.service}: ${qty(l.quantity)} ${l.unit}`.trim(), subtitle: `${usd(l.cost)} billed` })),
+          items: [
+            ...usage.lines.slice(0, 8).map((l) => ({ title: `${l.service}: ${qty(l.quantity)} ${l.unit}`.trim(), subtitle: `${usd(l.cost)} billed` })),
+            ...(Math.abs(usage.other) >= 0.005 ? [{ title: "Plan fees, credits and tax", subtitle: `${usd(usage.other)} billed` }] : []),
+          ],
           empty: "No usage charged yet this month.",
         }
       : u30
@@ -279,7 +341,7 @@ export const vercel: Plugin = {
         { label: "Production branch", value: p.link?.productionBranch ?? "–" },
         { label: "Published", value: live?.createdAt ? ago(live.createdAt) : "never" },
         ...(deploys24h !== undefined
-          ? [{ label: "Deploys (24h)", value: `${num(deploys24h)} / ${num(deploysMax)}`, tone: deployTone, limit: { used: deploys24h, max: deploysMax } }]
+          ? [{ label: "Deploys (24h)", value: `${num(deploys24h)}${d24?.more ? "+" : ""} / ${num(deploysMax)}`, tone: deployTone, limit: { used: deploys24h, max: deploysMax } }]
           : []),
         ...usageStats,
         ...(usage ? [{ label: "Billed this month", value: usd(usage.total) }] : []),
@@ -291,11 +353,11 @@ export const vercel: Plugin = {
       ],
       actions: [
         ...(p.paused ? [{ id: "unpause", label: "Resume project", confirm: "Resume this project and bring the site back online?" }] : []),
-        ...(live?.id ? [{ id: "redeploy", label: "Redeploy production", args: { deploymentId: live.id } }] : []),
+        ...(live?.id ? [{ id: "redeploy", label: "Redeploy production", confirm: "Build and publish production again? This uses one of today's deploys." }] : []),
       ],
       links: [
         ...(live?.url ? [{ label: "Live site", url: `https://${live.alias?.[0] ?? live.url}` }] : []),
-        { label: "Deployments", url: `${projectUrl}/deployments` },
+        ...(knownUrl ? [{ label: "Deployments", url: `${projectUrl}/deployments` }] : []),
         { label: "Usage", url: usageUrl },
       ],
     };
@@ -304,13 +366,16 @@ export const vercel: Plugin = {
   // Saved every hour for analytics tiles.
   async collect(ctx) {
     const tq = await team(ctx);
-    const [deploys, usage, u30] = await Promise.all([deploysLast24h(ctx, tq), optional(usageThisMonth(ctx, tq)), optional(usage30d(ctx, tq))]);
-    const tags = { team: tq ? decodeURIComponent(tq.split("=")[1]) : "personal" };
-    // Hobby limits only apply without billing data (see `load`).
-    const limit = (metric: string, value: number) => (usage ? [] : [{ metric: `${metric}.limit`, value, tags }]);
+    const p = await project(ctx, tq);
+    const deploysMax = Number(ctx.config.deploysPerDay) || DEFAULT_DEPLOYS_PER_DAY;
+    const [deploys, usage, u30] = await Promise.all([deploysLast24h(ctx, tq, deploysMax), optional(usageThisMonth(ctx, tq)), optional(usage30d(ctx, tq))]);
+    // Tagged with the id of the team that owns the project, so a slug in settings doesn't start a second series.
+    const tags = { team: String(p.accountId ?? (tq ? decodeURIComponent(tq.split("=")[1]) : "personal")) };
+    // Hobby limits only apply when Vercel says there's no billing data (see `load`).
+    const limit = (metric: string, value: number) => (usage === null ? [{ metric: `${metric}.limit`, value, tags }] : []);
     return [
-      { metric: "vercel.deploys_24h", value: deploys, tags },
-      { metric: "vercel.deploys_24h.limit", value: Number(ctx.config.deploysPerDay) || DEFAULT_DEPLOYS_PER_DAY, tags },
+      { metric: "vercel.deploys_24h", value: deploys.count, tags },
+      { metric: "vercel.deploys_24h.limit", value: deploysMax, tags },
       ...(usage ? [{ metric: "vercel.billed_usd_month", value: Math.round(usage.total * 100) / 100, tags }] : []),
       ...(u30
         ? [
@@ -325,23 +390,29 @@ export const vercel: Plugin = {
   },
 
   actions: {
-    async redeploy(ctx, { deploymentId }) {
+    // Rebuilds what's live now, read from the project rather than from the button.
+    async redeploy(ctx) {
       const tq = await team(ctx);
       const p = await project(ctx, tq);
+      const live = p.targets?.production?.id;
+      if (!live) throw new PluginError("other", "This project has nothing in production to redeploy yet.");
       await vc(ctx, "/v13/deployments?forceNew=1", tq, {
         method: "POST",
-        body: { name: p.name, project: p.id, deploymentId: String(deploymentId), target: "production" },
+        body: { name: p.name, project: p.id, deploymentId: String(live), target: "production" },
       });
       return "Redeploying production. It will go live when the build finishes.";
     },
     async rollback(ctx, { deploymentId }) {
       const tq = await team(ctx);
       const p = await project(ctx, tq);
+      await ownDeployment(ctx, tq, p.id, deploymentId);
       await vc(ctx, `/v1/projects/${p.id}/rollback/${encodeURIComponent(String(deploymentId))}`, tq, { method: "POST" });
       return "Rolled back: that deploy is now live.";
     },
     async cancel(ctx, { deploymentId }) {
       const tq = await team(ctx);
+      const p = await project(ctx, tq);
+      await ownDeployment(ctx, tq, p.id, deploymentId);
       await vc(ctx, `/v12/deployments/${encodeURIComponent(String(deploymentId))}/cancel`, tq, { method: "PATCH" });
       return "Deploy canceled.";
     },
@@ -351,6 +422,7 @@ export const vercel: Plugin = {
       await vc(ctx, `/v1/projects/${p.id}/unpause`, tq, { method: "POST" });
       return "Project resumed.";
     },
+    // The domain is looked up under this project, so Vercel refuses one that isn't on it.
     async verifyDomain(ctx, { domain }) {
       const tq = await team(ctx);
       const p = await project(ctx, tq);

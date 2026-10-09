@@ -36,6 +36,7 @@ export function LinkTool({ tool }: { tool: Tool }) {
       <button
         className={`link-tool ${wide ? "wide" : ""}`}
         title={url}
+        aria-label={title}
         onClick={async () => {
           const r = await api.openLocal(url).catch((e) => ({ ok: false, error: e.message }));
           if (!r.ok) alert(r.error);
@@ -46,7 +47,7 @@ export function LinkTool({ tool }: { tool: Tool }) {
     );
   }
   return (
-    <a className={`link-tool ${wide ? "wide" : ""}`} href={url} target="_blank" rel="noreferrer" title={`${title}\n${url}`}>
+    <a className={`link-tool ${wide ? "wide" : ""}`} href={url} target="_blank" rel="noreferrer" title={`${title}\n${url}`} aria-label={title}>
       {content}
     </a>
   );
