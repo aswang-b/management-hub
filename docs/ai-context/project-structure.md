@@ -29,8 +29,8 @@ server/
   check-plugins.ts      npm run check-plugins
   plugins/
     framework.ts        Plugin interface, request(), expectShape(), optional()
-    index.ts            plugin registry, 60 s result cache, runLoad/runAction
-    github|supabase|netlify|cloudflare|resend|google|status.ts   one per service
+    index.ts            plugin registry, 60 s result cache, runLoad/runAction/runCollect, token names
+    <service>.ts        one per service (current list: server/plugins/CONTEXT.md)
     plugins.test.ts     tests for every plugin and action
   *.test.ts             metrics, db (restore), secrets, grid placement
 shared/types.ts         types used by server and page (Project, Tool, PluginView, grid helpers)
