@@ -33,8 +33,9 @@ server/
     <service>.ts        one per service (current list: server/plugins/CONTEXT.md)
     plugins.test.ts     tests for every plugin and action
   *.test.ts             metrics, db (restore), secrets, grid placement
-shared/types.ts         types used by server and page (Project, Tool, PluginView, grid helpers)
-shared/metrics.ts       analytics types, ranges, value formatting
+shared/                 used by server and page (see shared/CONTEXT.md)
+  types.ts              Project, Tool, PluginView, grid helpers (makeRoom, refit)
+  metrics.ts            analytics types, ranges, value formatting
 web/
   index.html, public/   page shell, icon, PWA manifest
   src/

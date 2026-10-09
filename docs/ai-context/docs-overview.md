@@ -9,14 +9,15 @@
 | Tech stack, scripts, file tree | `docs/ai-context/project-structure.md` |
 | Server routes, database, link helpers | `server/CONTEXT.md` |
 | Writing or fixing a plugin | `server/plugins/CONTEXT.md` |
-| The page: grid, builder mode, tool types | `web/src/CONTEXT.md` |
+| The page: grid, builder mode, tool types (covers `components/` and `tools/`) | `web/src/CONTEXT.md` |
+| Types and grid/analytics helpers used by both sides | `shared/CONTEXT.md` |
 | Which tokens each plugin needs | `.env.example` |
 
 ## Tiers
 | Tier | Files | Update when |
 |---|---|---|
 | 1 | `CLAUDE.md`, `docs/ai-context/project-structure.md`, `docs/ai-context/docs-overview.md` | Stack, layout or conventions change |
-| 2 | `server/CONTEXT.md`, `web/src/CONTEXT.md` | A component's files or patterns change |
+| 2 | `server/CONTEXT.md`, `web/src/CONTEXT.md`, `shared/CONTEXT.md` | A component's files or patterns change |
 | 3 | `server/plugins/CONTEXT.md` | Plugin framework or plugin list changes |
 
 `README.md` and `docs/project-brief.md` sit outside the tiers: the README is

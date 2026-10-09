@@ -13,7 +13,7 @@ known gaps; update them when something from it is built.
 
 More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
 `docs/ai-context/docs-overview.md` (which doc answers what), and a
-`CONTEXT.md` in `server/`, `server/plugins/` and `web/src/`.
+`CONTEXT.md` in `server/`, `server/plugins/`, `web/src/` and `shared/`.
 
 ## Layout
 - `server/index.ts`: Hono API routes + serves `web/dist`. Loads `.env` itself.
