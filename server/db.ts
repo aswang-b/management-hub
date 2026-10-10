@@ -2,7 +2,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { GRID_WIDTH, refit, type Project, type Tool, type ToolCategory } from "../shared/types.ts";
+import {
+  GRID_WIDTH, SIDE_ZONES, ZONES, normalizeSides, refit,
+  type Project, type Scratch, type SideZone, type Sides, type Tool, type ToolCategory, type Zone,
+} from "../shared/types.ts";
 
 const DB_PATH = process.env.HUB_DB ?? "data/hub.db";
 if (DB_PATH !== ":memory:") mkdirSync("data", { recursive: true });
@@ -26,6 +29,12 @@ db.exec(`
     config TEXT NOT NULL DEFAULT '{}',
     data TEXT NOT NULL DEFAULT '{}'
   );
+  CREATE TABLE IF NOT EXISTS scratchpads (
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    side TEXT NOT NULL,
+    data TEXT NOT NULL,
+    PRIMARY KEY (project_id, side)
+  );
   CREATE TABLE IF NOT EXISTS cache (
     key TEXT PRIMARY KEY,
     value BLOB,
@@ -36,12 +45,24 @@ db.exec(`
 
 type Row = Record<string, any>;
 
-const toProject = (r: Row): Project => ({ id: r.id, name: r.name, gridWidth: r.grid_width, sort: r.sort });
+// Columns added after the first version.
+const hasColumn = (table: string, col: string) =>
+  (db.prepare(`PRAGMA table_info(${table})`).all() as Row[]).some((c) => c.name === col);
+if (!hasColumn("projects", "sides")) db.exec("ALTER TABLE projects ADD COLUMN sides TEXT NOT NULL DEFAULT '{}'");
+if (!hasColumn("tools", "zone")) db.exec("ALTER TABLE tools ADD COLUMN zone TEXT NOT NULL DEFAULT 'main'");
+
+export const isZone = (z: unknown): z is Zone => ZONES.includes(z as Zone);
+export const isSideZone = (z: unknown): z is SideZone => SIDE_ZONES.includes(z as SideZone);
+
+const toProject = (r: Row): Project => ({
+  id: r.id, name: r.name, gridWidth: r.grid_width, sort: r.sort, sides: normalizeSides(JSON.parse(r.sides)),
+});
 const toTool = (r: Row): Tool => ({
   id: r.id,
   projectId: r.project_id,
   category: r.category,
   type: r.type,
+  zone: isZone(r.zone) ? r.zone : "main",
   x: r.x, y: r.y, w: r.w, h: r.h,
   config: JSON.parse(r.config),
   data: JSON.parse(r.data),
@@ -67,15 +88,25 @@ export function createProject(name: string): Project {
   return toProject(r);
 }
 
-export function updateProject(id: number, patch: { name?: string; gridWidth?: number }): Project | undefined {
+export function updateProject(id: number, patch: { name?: string; gridWidth?: number; sides?: unknown }): Project | undefined {
   const p = getProject(id);
   if (!p) return undefined;
   const name = patch.name?.trim() || p.name;
   const gridWidth = patch.gridWidth === undefined ? p.gridWidth : clampWidth(patch.gridWidth);
-  db.prepare("UPDATE projects SET name = ?, grid_width = ? WHERE id = ?").run(name, gridWidth, id);
-  // Keep every tool inside the new width.
-  if (gridWidth < p.gridWidth) saveLayout(id, refit(listTools(id), gridWidth));
+  const sides = patch.sides === undefined ? p.sides : normalizeSides(patch.sides, p.sides);
+  db.prepare("UPDATE projects SET name = ?, grid_width = ?, sides = ? WHERE id = ?").run(name, gridWidth, JSON.stringify(sides), id);
+  fitZones(id, gridWidth, sides);
   return getProject(id);
+}
+
+/** Keeps every tool inside its grid's width (after a grid gets narrower). */
+function fitZones(projectId: number, gridWidth: number, sides: Sides) {
+  const tools = listTools(projectId);
+  for (const zone of ZONES) {
+    const cols = zone === "main" ? gridWidth : sides[zone].gridWidth;
+    const inZone = tools.filter((t) => t.zone === zone);
+    if (inZone.some((t) => t.x + t.w > cols)) saveLayout(projectId, refit(inZone, cols));
+  }
 }
 
 export function deleteProject(id: number) {
@@ -98,20 +129,24 @@ export function getTool(id: string): Tool | undefined {
   return r && toTool(r);
 }
 
-export function createTool(t: Omit<Tool, "id" | "data"> & { data?: Tool["data"] }): Tool {
+export function createTool(t: Omit<Tool, "id" | "data" | "zone"> & { data?: Tool["data"]; zone?: Zone }): Tool {
   const id = randomUUID();
   db.prepare(
-    "INSERT INTO tools (id, project_id, category, type, x, y, w, h, config, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  ).run(id, t.projectId, t.category as ToolCategory, t.type, t.x, t.y, t.w, t.h, JSON.stringify(t.config ?? {}), JSON.stringify(t.data ?? {}));
+    "INSERT INTO tools (id, project_id, category, type, zone, x, y, w, h, config, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(
+    id, t.projectId, t.category as ToolCategory, t.type, isZone(t.zone) ? t.zone : "main",
+    t.x, t.y, t.w, t.h, JSON.stringify(t.config ?? {}), JSON.stringify(t.data ?? {}),
+  );
   return getTool(id)!;
 }
 
-export function updateTool(id: string, patch: Partial<Pick<Tool, "x" | "y" | "w" | "h" | "config" | "data">>): Tool | undefined {
+export function updateTool(id: string, patch: Partial<Pick<Tool, "zone" | "x" | "y" | "w" | "h" | "config" | "data">>): Tool | undefined {
   const t = getTool(id);
   if (!t) return undefined;
   const next = { ...t, ...patch };
-  db.prepare("UPDATE tools SET x = ?, y = ?, w = ?, h = ?, config = ?, data = ? WHERE id = ?").run(
-    next.x, next.y, next.w, next.h, JSON.stringify(next.config), JSON.stringify(next.data), id,
+  if (!isZone(next.zone)) next.zone = t.zone;
+  db.prepare("UPDATE tools SET zone = ?, x = ?, y = ?, w = ?, h = ?, config = ?, data = ? WHERE id = ?").run(
+    next.zone, next.x, next.y, next.w, next.h, JSON.stringify(next.config), JSON.stringify(next.data), id,
   );
   return getTool(id);
 }
@@ -132,31 +167,38 @@ export function saveLayout(projectId: number, items: { id: string; x: number; y:
 export interface Snapshot {
   name: string;
   gridWidth: number;
+  /** Missing in snapshots from before sides existed: the sides are then left as they are. */
+  sides?: unknown;
   tools: Tool[];
 }
 
 /**
- * Puts a project back to a snapshot: its name, grid width, and which tools
- * exist with their places, sizes and settings. Content typed into a tool
- * since then (e.g. notes) is kept for tools that still exist.
+ * Puts a project back to a snapshot: its name, grid widths, sides, and which
+ * tools exist with their places, sizes and settings. Content typed into a
+ * tool or a scratchpad since then (e.g. notes) is kept.
  */
 export function restoreProject(id: number, snap: Snapshot): Project | undefined {
-  if (!getProject(id)) return undefined;
+  const p = getProject(id);
+  if (!p) return undefined;
   const keep = new Set(snap.tools.map((t) => t.id));
+  const sides = snap.sides === undefined ? p.sides : normalizeSides(snap.sides, p.sides);
   db.exec("BEGIN");
   try {
-    db.prepare("UPDATE projects SET name = ?, grid_width = ? WHERE id = ?").run(snap.name.trim() || "Untitled", clampWidth(snap.gridWidth), id);
+    db.prepare("UPDATE projects SET name = ?, grid_width = ?, sides = ? WHERE id = ?").run(
+      snap.name.trim() || "Untitled", clampWidth(snap.gridWidth), JSON.stringify(sides), id,
+    );
     for (const t of listTools(id)) if (!keep.has(t.id)) deleteTool(t.id);
-    const update = db.prepare("UPDATE tools SET x = ?, y = ?, w = ?, h = ?, config = ? WHERE id = ? AND project_id = ?");
+    const update = db.prepare("UPDATE tools SET zone = ?, x = ?, y = ?, w = ?, h = ?, config = ? WHERE id = ? AND project_id = ?");
     const insert = db.prepare(
-      "INSERT INTO tools (id, project_id, category, type, x, y, w, h, config, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tools (id, project_id, category, type, zone, x, y, w, h, config, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     );
     for (const t of snap.tools) {
       const config = JSON.stringify(t.config ?? {});
+      const zone = isZone(t.zone) ? t.zone : "main";
       const existing = getTool(t.id);
       if (existing && existing.projectId !== id) continue; // never touch another project's tools
-      if (existing) update.run(t.x, t.y, t.w, t.h, config, t.id, id);
-      else insert.run(t.id, id, t.category, t.type, t.x, t.y, t.w, t.h, config, JSON.stringify(t.data ?? {}));
+      if (existing) update.run(zone, t.x, t.y, t.w, t.h, config, t.id, id);
+      else insert.run(t.id, id, t.category, t.type, zone, t.x, t.y, t.w, t.h, config, JSON.stringify(t.data ?? {}));
     }
     db.exec("COMMIT");
   } catch (e) {
@@ -168,6 +210,17 @@ export function restoreProject(id: number, snap: Snapshot): Project | undefined 
 
 export function deleteTool(id: string) {
   db.prepare("DELETE FROM tools WHERE id = ?").run(id);
+}
+
+// ---- Scratchpads (one per side of a project)
+
+export function getScratch(projectId: number, side: SideZone): Scratch {
+  const r = db.prepare("SELECT data FROM scratchpads WHERE project_id = ? AND side = ?").get(projectId, side) as Row | undefined;
+  return r ? JSON.parse(r.data) : { texts: [], strokes: [] };
+}
+
+export function saveScratch(projectId: number, side: SideZone, data: Scratch) {
+  db.prepare("INSERT OR REPLACE INTO scratchpads (project_id, side, data) VALUES (?, ?, ?)").run(projectId, side, JSON.stringify(data));
 }
 
 // ---- Small key/value cache (favicons, link titles)

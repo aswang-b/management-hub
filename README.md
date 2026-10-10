@@ -16,6 +16,18 @@ The original request, what's built so far and what's planned are in
 - **Projects** are listed across the top. `+ New` adds one.
 - Each project is a **grid** of tools. The grid is 6 squares wide by default;
   change it (4 to 12) in project settings (⚙).
+- On a wide screen, the space **either side of the grid** is used too. Each
+  side is a **scratchpad** to begin with: click anywhere on it to type, or pick
+  **✎ Draw** to draw with the mouse, a pen or your finger. **⌫ Erase** removes
+  lines and text you click or drag over, **↶** undoes the last scratchpad
+  change, and **✕** clears it. Drag a piece of text by the **⠿** at its left.
+  Everything saves by itself. In builder mode, the switch above each side turns
+  it into a **Grid** instead: another space for tools, with its own width
+  (**−** / **+**, 1 to 6 squares). Drag tools from the left panel onto it, or
+  move a tool between grids with **⇄** on the tool. Switching a side back to
+  a scratchpad keeps its tools (and the scratchpad keeps its writing while
+  it's a grid). The sides only show when the window is wide enough; on a phone,
+  tools on side grids are listed after the main grid's.
 - **Build** turns on builder mode: drag tools from the left panel onto the
   grid (or click a size to drop it in the first free spot), drag tools around,
   change their size (⇲), edit their settings (⚙) or remove them (✕). Press

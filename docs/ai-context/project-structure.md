@@ -23,7 +23,7 @@
 Install Management Hub.cmd / Uninstall Management Hub.cmd   double-click installer (calls windows-app.ps1)
 server/
   index.ts              API routes under /api, host/origin guard, serves web/dist
-  db.ts                 SQLite tables: projects, tools, cache
+  db.ts                 SQLite tables: projects, tools, scratchpads, cache
   metrics.ts            analytics: metrics table, combining, chart buckets
   collector.ts          hourly job running each plugin's collect()
   links.ts              site title/favicon lookup, open local files
@@ -48,7 +48,7 @@ web/
     App.tsx             project switcher, builder-mode toggle, Undo/Redo/Revert, Tokens
     useUndo.ts          builder-mode history (snapshots restored on the server)
     api.ts              fetch wrapper for /api
-    components/         Workspace (grid), Palette, ToolSettings, ProjectSettings, Modal, Tokens
+    components/         Workspace (zones), ZoneGrid, Scratchpad, Palette, ToolSettings, ProjectSettings, Modal, Tokens
     tools/              registry.tsx, LinkTool, NotesModule, PluginTool, AnalyticsModule, charts
     styles.css          black/white theme
 docs/
@@ -57,9 +57,12 @@ docs/
 ```
 
 ## Data model
-- **Project**: a named workspace with a grid width (4–12 squares, `GRID_WIDTH`).
-- **Tool**: one tile on a project's grid: `category` (link / plugin / module),
-  `type`, position and size, `config` (settings) and `data` (e.g. notes text).
+- **Project**: a named workspace with a main grid width (4–12 squares, `GRID_WIDTH`)
+  and two **sides** (left/right of the main grid), each a grid (1–6 squares) or a scratchpad.
+- **Tool**: one tile on one of a project's grids: `category` (link / plugin / module),
+  `type`, `zone` (main / left / right), position and size, `config` (settings)
+  and `data` (e.g. notes text).
+- **Scratchpad**: what's typed and drawn on a side (`scratchpads` table, per project and side).
 
 ## How a plugin tile works
 1. Page asks `GET /api/tools/:id/plugin`.

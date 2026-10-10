@@ -30,8 +30,10 @@ More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
 - `server/plugins/*.ts`: one file per service. Each exports a `Plugin`
   (`framework.ts`) and is registered in `plugins/index.ts`.
 - `web/src/`: React page. `tools/registry.tsx` lists tool types and sizes;
-  `components/Workspace.tsx` is the grid and builder mode (other tools make
-  room while one is dragged: `makeRoom` in `shared/types.ts`); `useUndo.ts`
+  `components/Workspace.tsx` is the zones (main grid + a side each way, each
+  side a grid or a scratchpad) and builder mode; `ZoneGrid.tsx` is one grid
+  (other tools make room while one is dragged: `makeRoom` in `shared/types.ts`);
+  `Scratchpad.tsx` is a side to type and draw on; `useUndo.ts`
   is builder mode's Undo/Redo/Revert; `components/Tokens.tsx` is the token UI.
 - `scripts/windows-app.ps1` (`npm run app:*`, and the `Install`/`Uninstall Management Hub.cmd`
   files): runs the hub as a hidden Windows task at sign-in (`scripts/run-hidden.cmd`,

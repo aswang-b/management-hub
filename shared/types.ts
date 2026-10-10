@@ -5,8 +5,51 @@ export type ToolCategory = "link" | "plugin" | "module";
 export interface Project {
   id: number;
   name: string;
+  /** Width of the main grid, in squares. */
   gridWidth: number;
   sort: number;
+  /** The spaces left and right of the main grid. */
+  sides: Sides;
+}
+
+// ---- Zones: the main grid plus a space on each side of it. A side is either
+// another grid of tools (with its own width) or a scratchpad to type and draw on.
+
+export type SideZone = "left" | "right";
+export type Zone = "main" | SideZone;
+export const ZONES: Zone[] = ["main", "left", "right"];
+export const SIDE_ZONES: SideZone[] = ["left", "right"];
+export type SideMode = "grid" | "scratchpad";
+export interface SideSettings {
+  mode: SideMode;
+  /** Width of the side's grid, in squares (used when mode is "grid"). */
+  gridWidth: number;
+}
+export type Sides = Record<SideZone, SideSettings>;
+export const SIDE_GRID_WIDTH = { min: 1, max: 6, default: 2 } as const;
+
+const clamp = (n: unknown, r: { min: number; max: number; default: number }) =>
+  Math.min(r.max, Math.max(r.min, Math.round(Number(n)) || r.default));
+
+/** Fills in and corrects side settings (from the database or a request). */
+export function normalizeSides(v: unknown, base?: Sides): Sides {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, any>;
+  const side = (k: SideZone): SideSettings => {
+    const s = o[k] && typeof o[k] === "object" ? o[k] : {};
+    const b = base?.[k] ?? { mode: "scratchpad", gridWidth: SIDE_GRID_WIDTH.default };
+    return {
+      mode: s.mode === "grid" || s.mode === "scratchpad" ? s.mode : b.mode,
+      gridWidth: s.gridWidth === undefined ? b.gridWidth : clamp(s.gridWidth, SIDE_GRID_WIDTH),
+    };
+  };
+  return { left: side("left"), right: side("right") };
+}
+
+/** What's typed and drawn on a scratchpad. Positions are in pixels from its top-left corner. */
+export interface Scratch {
+  texts: { id: string; x: number; y: number; text: string }[];
+  /** Each stroke is a list of points, flattened: [x1, y1, x2, y2, ...]. */
+  strokes: { id: string; points: number[] }[];
 }
 
 export interface Tool {
@@ -15,6 +58,8 @@ export interface Tool {
   category: ToolCategory;
   /** Which tool this is, e.g. "link", "notes", or a plugin id like "github". */
   type: string;
+  /** Which grid the tool is on. */
+  zone: Zone;
   x: number;
   y: number;
   w: number;

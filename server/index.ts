@@ -58,7 +58,10 @@ api.post("/projects/:id/tools", async (c) => {
   if (!db.getProject(projectId)) return c.json({ error: "Project not found" }, 404);
   if (!["link", "plugin", "module"].includes(b.category)) return c.json({ error: "Unknown tool category" }, 400);
   return c.json(
-    db.createTool({ projectId, category: b.category, type: String(b.type), x: b.x, y: b.y, w: b.w, h: b.h, config: b.config ?? {}, data: b.data ?? {} }),
+    db.createTool({
+      projectId, category: b.category, type: String(b.type), zone: b.zone,
+      x: b.x, y: b.y, w: b.w, h: b.h, config: b.config ?? {}, data: b.data ?? {},
+    }),
   );
 });
 // Builder mode's Undo and Revert send back an earlier snapshot of the project.
@@ -68,8 +71,37 @@ api.post("/projects/:id/restore", async (c) => {
   if (b.tools.some((t: any) => !["link", "plugin", "module"].includes(t?.category) || typeof t.id !== "string")) {
     return c.json({ error: "Unknown tool in the snapshot" }, 400);
   }
-  const p = db.restoreProject(Number(c.req.param("id")), { name: String(b.name ?? ""), gridWidth: b.gridWidth, tools: b.tools });
+  const p = db.restoreProject(Number(c.req.param("id")), { name: String(b.name ?? ""), gridWidth: b.gridWidth, sides: b.sides, tools: b.tools });
   return p ? c.json(p) : c.json({ error: "Project not found" }, 404);
+});
+
+// ---- Scratchpads: what's typed and drawn on a side of a project.
+api.get("/projects/:id/scratch/:side", (c) => {
+  const side = c.req.param("side");
+  if (!db.isSideZone(side)) return c.json({ error: "Unknown side" }, 400);
+  return c.json(db.getScratch(Number(c.req.param("id")), side));
+});
+api.put("/projects/:id/scratch/:side", async (c) => {
+  const side = c.req.param("side");
+  const projectId = Number(c.req.param("id"));
+  if (!db.isSideZone(side)) return c.json({ error: "Unknown side" }, 400);
+  if (!db.getProject(projectId)) return c.json({ error: "Project not found" }, 404);
+  const b = await c.req.json();
+  const num = (n: unknown) => typeof n === "number" && Number.isFinite(n);
+  const texts = Array.isArray(b?.texts) ? b.texts : undefined;
+  const strokes = Array.isArray(b?.strokes) ? b.strokes : undefined;
+  if (
+    !texts || !strokes ||
+    !texts.every((t: any) => typeof t?.id === "string" && num(t.x) && num(t.y) && typeof t.text === "string") ||
+    !strokes.every((s: any) => typeof s?.id === "string" && Array.isArray(s.points) && s.points.every(num))
+  ) {
+    return c.json({ error: "Expected a scratchpad (texts and strokes)" }, 400);
+  }
+  db.saveScratch(projectId, side, {
+    texts: texts.map(({ id, x, y, text }: any) => ({ id, x, y, text })),
+    strokes: strokes.map(({ id, points }: any) => ({ id, points })),
+  });
+  return c.json({ ok: true });
 });
 api.put("/projects/:id/layout", async (c) => {
   db.saveLayout(Number(c.req.param("id")), await c.req.json());

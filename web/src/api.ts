@@ -1,5 +1,5 @@
 // Calls to the hub's local server.
-import type { PluginMeta, PluginResult, Project, Tool } from "../../shared/types.ts";
+import type { PluginMeta, PluginResult, Project, Scratch, SideZone, Sides, Tool } from "../../shared/types.ts";
 import type { AnalyticsResult, CollectRun, Series } from "../../shared/metrics.ts";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -15,17 +15,20 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export const api = {
   projects: () => call<Project[]>("GET", "/projects"),
   createProject: (name: string) => call<Project>("POST", "/projects", { name }),
-  updateProject: (id: number, patch: Partial<Pick<Project, "name" | "gridWidth">>) => call<Project>("PATCH", `/projects/${id}`, patch),
+  updateProject: (id: number, patch: Partial<Pick<Project, "name" | "gridWidth" | "sides">>) => call<Project>("PATCH", `/projects/${id}`, patch),
   deleteProject: (id: number) => call("DELETE", `/projects/${id}`),
-  restoreProject: (id: number, snapshot: { name: string; gridWidth: number; tools: Tool[] }) =>
+  restoreProject: (id: number, snapshot: { name: string; gridWidth: number; sides: Sides; tools: Tool[] }) =>
     call<Project>("POST", `/projects/${id}/restore`, snapshot),
 
   tools: (projectId: number) => call<Tool[]>("GET", `/projects/${projectId}/tools`),
   createTool: (projectId: number, t: Omit<Tool, "id" | "projectId" | "data">) => call<Tool>("POST", `/projects/${projectId}/tools`, t),
-  updateTool: (id: string, patch: Partial<Pick<Tool, "x" | "y" | "w" | "h" | "config" | "data">>) => call<Tool>("PATCH", `/tools/${id}`, patch),
+  updateTool: (id: string, patch: Partial<Pick<Tool, "zone" | "x" | "y" | "w" | "h" | "config" | "data">>) => call<Tool>("PATCH", `/tools/${id}`, patch),
   deleteTool: (id: string) => call("DELETE", `/tools/${id}`),
   saveLayout: (projectId: number, items: { id: string; x: number; y: number; w: number; h: number }[]) =>
     call("PUT", `/projects/${projectId}/layout`, items),
+
+  scratch: (projectId: number, side: SideZone) => call<Scratch>("GET", `/projects/${projectId}/scratch/${side}`),
+  saveScratch: (projectId: number, side: SideZone, data: Scratch) => call("PUT", `/projects/${projectId}/scratch/${side}`, data),
 
   plugins: () => call<PluginMeta[]>("GET", "/plugins"),
   pluginView: (toolId: string, fresh = false) => call<PluginResult>("GET", `/tools/${toolId}/plugin${fresh ? "?fresh=1" : ""}`),

@@ -6,7 +6,10 @@ of Node-only and browser-only APIs so both sides can run it.
 
 ## Key files
 - `types.ts`: the data model and the plugin contract.
-  - `Project`, `Tool` (category, type, position/size, `config`, `data`), `GRID_WIDTH` (4–12).
+  - `Project`, `Tool` (category, type, `zone`, position/size, `config`, `data`), `GRID_WIDTH` (4–12).
+  - Zones: `Zone` (`main` / `left` / `right`), `Sides` (each side's `mode`, grid
+    or scratchpad, and `gridWidth`, `SIDE_GRID_WIDTH` 1–6), `normalizeSides`
+    (defaults and limits), `Scratch` (texts and strokes, in pixels).
   - Plugin view: `PluginView`, `PluginItem`, `PluginAction`, `Tone`, `PluginResult`.
   - Plugin metadata: `PluginMeta`, `EnvVar` (token `key`, `help`, `url`, `steps`),
     `PluginConfigField` (`text` / `number` / `select`, `timestamped`).

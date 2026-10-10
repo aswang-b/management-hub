@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "hub-preview",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set HUB_PORT=8790&& set HUB_DB=data/preview.db&& npm run serve"],
+      "port": 8790
     }
   ]
 }

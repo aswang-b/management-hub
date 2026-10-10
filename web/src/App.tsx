@@ -134,6 +134,15 @@ export function App() {
             building={building}
             toolsRef={toolsRef}
             onBeforeChange={history.checkpoint}
+            onSidesChange={async (sides) => {
+              if (building) history.checkpoint();
+              try {
+                const p = await api.updateProject(current.id, { sides });
+                setProjects((ps) => ps?.map((x) => (x.id === p.id ? p : x)));
+              } catch (e) {
+                alert(`Couldn't save the change: ${(e as Error).message}`);
+              }
+            }}
           />
         )}
       </main>

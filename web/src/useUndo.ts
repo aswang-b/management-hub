@@ -4,12 +4,13 @@
 // those snapshots; Revert returns to how the project was when Build was
 // pressed. A new building session, or another project, starts fresh.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import type { Project, Tool } from "../../shared/types.ts";
+import type { Project, Sides, Tool } from "../../shared/types.ts";
 import { api } from "./api.ts";
 
 export interface Snapshot {
   name: string;
   gridWidth: number;
+  sides: Sides;
   tools: Tool[];
 }
 
@@ -33,7 +34,7 @@ export function useUndo(
 
   const now = useCallback((): Snapshot | undefined => {
     const t = tools.current;
-    return project && t ? { name: project.name, gridWidth: project.gridWidth, tools: t } : undefined;
+    return project && t ? { name: project.name, gridWidth: project.gridWidth, sides: project.sides, tools: t } : undefined;
   }, [project, tools]);
 
   /** Call just before a change. */

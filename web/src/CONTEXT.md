@@ -6,9 +6,21 @@ The React page. Built by Vite into `web/dist`, which the server serves.
 - `App.tsx`: loads projects and plugins, project switcher (URL `#/p/<id>`),
   builder-mode toggle, project settings.
 - `api.ts`: small fetch wrapper for `/api`.
-- `components/Workspace.tsx`: the grid (`react-grid-layout`). In builder mode
-  tiles can be added, moved, resized to allowed sizes, configured, removed.
-  On phones (< 640 px) links sit 4 per row and everything else is full width.
+- `components/Workspace.tsx`: the zones: main grid (at most 1200 px) and a side
+  each way, shown when each side gets at least 160 px (measured without the
+  palette, so building narrows the main grid instead of hiding the sides). It
+  owns the tools of all zones; in builder mode tiles can be added, moved (also
+  to another grid, ⇄), resized, configured, removed, and each side switched
+  between grid and scratchpad (`onSidesChange`, undoable).
+  On phones (< 640 px) links sit 4 per row and everything else is full width;
+  side-grid tools follow the main grid's, scratchpads aren't shown.
+- `components/ZoneGrid.tsx`: one grid (`react-grid-layout`) with its own width
+  and the drag compactor; reports drag stops and palette drops to Workspace.
+- `components/Scratchpad.tsx`: a side used as a scratchpad. Type mode adds a
+  text box on click (not pointer-down: the browser's mouse-down focus would
+  close it); draw mode records strokes with pointer capture; erase removes what
+  `elementsFromPoint` finds (`data-scratch`). Saves 600 ms after a change and
+  on unmount; its own ↶ history, separate from builder mode's Undo.
 - `components/Palette.tsx`: list of tools to drag in, with size shapes.
 - `components/ToolSettings.tsx`, `ProjectSettings.tsx`, `Modal.tsx`: dialogs.
   `Modal` renders into `document.body` (a portal) so dialogs opened from a
@@ -19,7 +31,7 @@ The React page. Built by Vite into `web/dist`, which the server serves.
 - `useUndo.ts`: Undo/Redo/Revert. `Workspace` calls `onBeforeChange()` before
   each change; snapshots are restored through `POST /projects/:id/restore`,
   then the workspace remounts (App's `rev` key).
-- Dragging: `Workspace` gives the grid a custom compactor that runs
+- Dragging: `ZoneGrid` gives each grid a custom compactor that runs
   `makeRoom` (`shared/types.ts`) from the tools' saved spots on every move, so
   pushed tools slide back. Positions are saved only on drag stop and drop.
 - In `npm run dev`, Vite forwards `/api` without changing the Host header
