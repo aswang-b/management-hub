@@ -1,8 +1,8 @@
 # Runs the hub in the background on Windows: a task starts it hidden each
-# time you sign in, and "Management Hub" shortcuts (Start menu, desktop) open
-# it in its own window. Used by `npm run app:install`, `app:restart`,
-# `app:stop`, `app:status` and `app:uninstall`, and by the Install/Uninstall
-# .cmd files in the hub folder.
+# time you sign in. The window itself is the page installed as an app from
+# Chrome (install opens it in Chrome for that). Used by `npm run app:install`,
+# `app:restart`, `app:stop`, `app:status` and `app:uninstall`, and by the
+# Install/Uninstall .cmd files in the hub folder.
 param([Parameter(Mandatory)][ValidateSet("install", "restart", "stop", "status", "uninstall")][string]$Command)
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +17,15 @@ if (Test-Path ".env") {
   if ($line -match '(\d+)') { $Port = [int]$Matches[1] }
 }
 $Url = "http://localhost:$Port"
+
+# Chrome puts the shortcut of an app installed from it here.
+$Programs = [Environment]::GetFolderPath("Programs")
+$ChromeAppShortcut = Join-Path $Programs "Chrome Apps\Management Hub.lnk"
+# Shortcuts made by an earlier version of this script; removed when found.
+$OldShortcuts = @(
+  (Join-Path $Programs "Management Hub.lnk"),
+  (Join-Path ([Environment]::GetFolderPath("Desktop")) "Management Hub.lnk")
+)
 
 function Get-Task { Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue }
 
@@ -36,25 +45,6 @@ function Stop-Hub {
   }
 }
 
-$Shortcuts = @(
-  (Join-Path ([Environment]::GetFolderPath("Programs")) "Management Hub.lnk"),
-  (Join-Path ([Environment]::GetFolderPath("Desktop")) "Management Hub.lnk")
-)
-
-# The shortcuts run open-window.ps1 through a hidden console, so no window flashes.
-function Add-Shortcuts {
-  $shell = New-Object -ComObject WScript.Shell
-  foreach ($path in $Shortcuts) {
-    $s = $shell.CreateShortcut($path)
-    $s.TargetPath = "$env:WINDIR\System32\conhost.exe"
-    $s.Arguments = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$Root\scripts\open-window.ps1`""
-    $s.WorkingDirectory = $Root
-    $s.IconLocation = "$Root\scripts\hub.ico,0"
-    $s.Description = "Open the Management Hub"
-    $s.Save()
-  }
-}
-
 function Build-Page {
   Write-Host "Building the page..."
   npm run build --silent
@@ -70,6 +60,14 @@ function Start-Hub {
   throw "The hub didn't start. See data\hub.log for the reason."
 }
 
+function Find-Chrome {
+  @(
+    "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+  ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+
 switch ($Command) {
   "install" {
     Build-Page
@@ -80,11 +78,23 @@ switch ($Command) {
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
       -Description "Runs the Management Hub ($Root) in the background." -Force | Out-Null
-    Add-Shortcuts
+    $OldShortcuts | Where-Object { Test-Path $_ } | Remove-Item
     Write-Host "Installed: the hub now starts by itself when you sign in to Windows."
-    Write-Host "Open it from 'Management Hub' in the Start menu or on your desktop."
     Stop-Hub
     Start-Hub
+    if (Test-Path $ChromeAppShortcut) {
+      Write-Host "Open it from 'Management Hub' in the Start menu."
+    } elseif ($chrome = Find-Chrome) {
+      Write-Host ""
+      Write-Host "Last step: in the Chrome window that just opened, click the install icon"
+      Write-Host "at the right of the address bar (or menu > Cast, save and share > Install page"
+      Write-Host "as app). Management Hub then gets its own window, Start menu entry and"
+      Write-Host "taskbar icon."
+      Start-Process $chrome -ArgumentList $Url
+    } else {
+      Write-Host "To get the hub's own window, install Google Chrome, open $Url in it and click"
+      Write-Host "the install icon at the right of the address bar. Until then, open $Url in any browser."
+    }
   }
   "restart" {
     if (-not (Get-Task)) { throw "The background app isn't installed. Run 'npm run app:install' first." }
@@ -97,15 +107,18 @@ switch ($Command) {
     Write-Host "Stopped. It starts again next time you sign in (or run 'npm run app:restart')."
   }
   "status" {
-    $task = Get-Task
-    if (-not $task) { Write-Host "Background app: not installed" } else { Write-Host "Background app: installed" }
+    if (Get-Task) { Write-Host "Background app: installed" } else { Write-Host "Background app: not installed" }
     if (Test-Running) { Write-Host "Hub: running at $Url" } else { Write-Host "Hub: not running" }
+    if (Test-Path $ChromeAppShortcut) { Write-Host "Window: installed from Chrome" } else { Write-Host "Window: not installed" }
   }
   "uninstall" {
     Stop-Hub
     if (Get-Task) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
-    $Shortcuts | Where-Object { Test-Path $_ } | Remove-Item
-    Write-Host "Removed: the hub no longer starts by itself and its shortcuts are gone."
+    $OldShortcuts | Where-Object { Test-Path $_ } | Remove-Item
+    Write-Host "Removed: the hub no longer starts by itself."
     Write-Host "Your projects and tokens are kept (data\hub.db and .env). 'npm start' still works."
+    if (Test-Path $ChromeAppShortcut) {
+      Write-Host "To remove its window too, right-click 'Management Hub' in the Start menu and choose Uninstall."
+    }
   }
 }

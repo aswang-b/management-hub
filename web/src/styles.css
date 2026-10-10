@@ -278,6 +278,18 @@ a.item-title:hover { text-decoration: underline; }
 .tone-pending { animation: blink 1.4s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
+/* Installed app with the title bar hidden (Chrome's "window controls
+   overlay"): the header becomes the title bar. Drag the window by its empty
+   parts; Windows' own close/minimize/maximize buttons sit at the top right,
+   so the header leaves room for them. */
+@media (display-mode: window-controls-overlay) {
+  .nav {
+    app-region: drag; -webkit-app-region: drag;
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  }
+  .nav a, .nav button, .nav input { app-region: no-drag; -webkit-app-region: no-drag; }
+}
+
 @media (max-width: 640px) {
   main { padding: 8px; }
   .brand { padding: 0 10px; }

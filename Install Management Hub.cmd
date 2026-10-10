@@ -22,7 +22,7 @@ if not exist .env copy .env.example .env >nul
 call npm run app:install --silent
 if errorlevel 1 goto failed
 echo.
-echo Done. Open "Management Hub" from the Start menu or your desktop.
+echo Done.
 pause
 exit /b 0
 

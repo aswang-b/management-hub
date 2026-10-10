@@ -105,30 +105,36 @@ Then open <http://localhost:8787>. On Windows you can instead double-click
 Instead of keeping a terminal open with `npm start`, the hub can run quietly
 in the background and open in its own window like any other app.
 
-**Double-click `Install Management Hub.cmd`** in the hub folder. It sets up
-everything (first time: installs the packages and creates `.env`), then:
+1. **Double-click `Install Management Hub.cmd`** in the hub folder. It sets
+   up everything (first time: installs the packages and creates `.env`), and
+   from then on the hub starts by itself, hidden, whenever you sign in to
+   Windows.
+2. At the end it opens the hub in Google Chrome. Click the **install icon** at
+   the right of the address bar (or Chrome's menu **⋮ → Cast, save and share →
+   Install page as app**). You only do this once.
 
-- the hub starts by itself, hidden, whenever you sign in to Windows;
-- **Management Hub** appears in the Start menu and on your desktop. It opens
-  the hub in its own window, with no tabs or address bar. Right-click it in
-  the Start menu to **Pin to taskbar**.
+**Management Hub** is then a program of its own: it has its own window, Start
+menu entry and taskbar icon (right-click it to **Pin to taskbar**). It has no
+title bar: the hub's black-and-white header takes its place, with the close,
+minimize and maximize buttons at the top right. Drag the window by an empty
+part of the header. (If a title bar still shows, click the **˄** button in it
+to hide it.)
 
-The window uses Chrome (or Edge if Chrome isn't installed) with a separate
-profile just for the hub, so it never mixes with your normal browsing and you
-don't need to use either as your browser. If the hub isn't running when you
-open the window, it starts it.
+Chrome needs to be installed for this, but you don't need to use it as your
+browser.
 
 Run the installer again after updating the code. **`Uninstall Management
-Hub.cmd`** removes the shortcuts and stops the hub starting at sign-in; your
-projects and tokens are kept. The same things are available as commands:
+Hub.cmd`** stops the hub starting at sign-in; your projects and tokens are
+kept. To remove the window too, right-click **Management Hub** in the Start
+menu and choose **Uninstall**. The same things are available as commands:
 
 | Command | What it does |
 |---|---|
-| `npm run app:install` | What the installer does: start the hub now and at every sign-in, add the shortcuts |
+| `npm run app:install` | What the installer does: start the hub now and at every sign-in, then open it in Chrome to install |
 | `npm run app:restart` | Rebuild the page and restart the hub, e.g. after updating the code |
 | `npm run app:stop` | Stop it until you next sign in (or restart it) |
-| `npm run app:status` | Say whether it's installed and running |
-| `npm run app:uninstall` | Stop it, stop starting it at sign-in, remove the shortcuts |
+| `npm run app:status` | Say whether it's set up, running, and installed as a window |
+| `npm run app:uninstall` | Stop it and stop starting it at sign-in |
 
 If the hub doesn't open, `data/hub.log` holds what it printed (the run
 before is in `data/hub.previous.log`). While the background app runs,

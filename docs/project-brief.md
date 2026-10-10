@@ -218,8 +218,8 @@ to get right. It's also the route to take later if webhooks are wanted.
 
 **Built?** Yes: phone layout, home-screen app details (manifest with PNG
 icons) and the Tailscale steps in the README. On Windows, `Install Management Hub.cmd`
-runs the hub as a hidden task started at sign-in and adds Start menu/desktop
-shortcuts that open it in its own window. **Not yet:** offline caching (a "service worker") so the app
+runs the hub as a hidden task started at sign-in, then opens it in Chrome to
+install as an app (own window and taskbar icon; header replaces the title bar). **Not yet:** offline caching (a "service worker") so the app
 opens instantly with the last-seen data when the computer is off.
 
 ---

@@ -36,10 +36,9 @@ server/
     plugins.test.ts     tests for every plugin and action
   *.test.ts             metrics, db (restore), secrets, grid placement
 scripts/
-  windows-app.ps1       npm run app:*: registers/starts/stops the "Management Hub" Windows task
+  windows-app.ps1       npm run app:*: registers/starts/stops the "Management Hub" Windows task;
+                        install opens the page in Chrome to install it as an app
   run-hidden.cmd        what the task runs (under conhost --headless): server, output to data/hub.log
-  open-window.ps1       what the shortcuts run: start the hub if needed, open a Chrome/Edge --app window
-  hub.ico               shortcut icon
 shared/                 used by server and page (see shared/CONTEXT.md)
   types.ts              Project, Tool, PluginView, grid helpers (makeRoom, refit)
   metrics.ts            analytics types, ranges, value formatting
