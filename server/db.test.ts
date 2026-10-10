@@ -86,3 +86,19 @@ test("scratchpads are saved per side and kept by Undo", () => {
   assert.deepEqual(db.getScratch(p.id, "left"), data);
   assert.deepEqual(db.getScratch(p.id, "right"), { texts: [], strokes: [] });
 });
+
+test("scratchpad content is checked: styles kept within limits, junk dropped", async () => {
+  const { cleanScratch } = await import("../shared/types.ts");
+  assert.equal(cleanScratch({ texts: "nope", strokes: [] }), undefined);
+  assert.equal(cleanScratch({ texts: [{ id: "a", x: 1, y: 2 }], strokes: [] }), undefined);
+  assert.deepEqual(
+    cleanScratch({
+      texts: [{ id: "a", x: 1, y: 2, text: "hi", size: 500, bold: true, italic: "yes", color: "#ABCDEF", extra: 1 }],
+      strokes: [{ id: "b", points: [0, 0, 3, 4], color: "red", width: 0 }],
+    }),
+    {
+      texts: [{ id: "a", x: 1, y: 2, text: "hi", size: 96, bold: true, color: "#abcdef" }],
+      strokes: [{ id: "b", points: [0, 0, 3, 4], width: 1 }],
+    },
+  );
+});

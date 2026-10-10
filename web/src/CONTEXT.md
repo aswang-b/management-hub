@@ -16,11 +16,19 @@ The React page. Built by Vite into `web/dist`, which the server serves.
   side-grid tools follow the main grid's, scratchpads aren't shown.
 - `components/ZoneGrid.tsx`: one grid (`react-grid-layout`) with its own width
   and the drag compactor; reports drag stops and palette drops to Workspace.
-- `components/Scratchpad.tsx`: a side used as a scratchpad. Type mode adds a
-  text box on click (not pointer-down: the browser's mouse-down focus would
-  close it); draw mode records strokes with pointer capture; erase removes what
-  `elementsFromPoint` finds (`data-scratch`). Saves 600 ms after a change and
-  on unmount; its own ↶ history, separate from builder mode's Undo.
+- `components/Scratchpad.tsx`: a side used as a scratchpad. Modes: pointer
+  (click text to edit, drag to move), type (adds a text box on click, not
+  pointer-down: the browser's mouse-down focus would close it), draw (pointer
+  capture; points clamped to the surface, the ink layer clips), erase (removes
+  what `elementsFromPoint` finds, `data-scratch`). Text options apply to the
+  selected text (toolbar buttons keep focus with `preventDefault` on
+  mouse-down); pen/text settings are kept in `localStorage`. Each mode sets its
+  own cursor (pen circle, eraser). Saves 600 ms after a change and on unmount;
+  its own ↶ history, separate from builder mode's Undo.
+- `components/ColorPicker.tsx`: swatch button + gradient panel (shade square,
+  hue bar, hex box). Colours are content, so they're allowed despite the theme.
+- Side grid widths are set in `ProjectSettings.tsx`; the grid/scratchpad switch
+  is above each side in builder mode.
 - `components/Palette.tsx`: list of tools to drag in, with size shapes.
 - `components/ToolSettings.tsx`, `ProjectSettings.tsx`, `Modal.tsx`: dialogs.
   `Modal` renders into `document.body` (a portal) so dialogs opened from a

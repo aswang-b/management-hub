@@ -11,7 +11,9 @@ export function isLocal(url: string) {
 export function LinkTool({ tool }: { tool: Tool }) {
   const url = String(tool.config.url ?? "");
   const title = String(tool.config.title || tool.data.siteTitle || hostOf(url));
-  const [iconFailed, setIconFailed] = useState(false);
+  // Which address's icon failed to load: a new address gets a fresh try.
+  const [iconFailedFor, setIconFailedFor] = useState<string>();
+  const iconFailed = iconFailedFor === url;
   const local = isLocal(url);
   const wide = tool.w > 1;
 
@@ -21,7 +23,7 @@ export function LinkTool({ tool }: { tool: Tool }) {
     local || iconFailed ? (
       <span className="link-letter">{local ? "▤" : title.charAt(0).toUpperCase()}</span>
     ) : (
-      <img className="link-icon" src={`/api/favicon?url=${encodeURIComponent(url)}`} alt="" onError={() => setIconFailed(true)} />
+      <img key={url} className="link-icon" src={`/api/favicon?url=${encodeURIComponent(url)}`} alt="" onError={() => setIconFailedFor(url)} />
     );
 
   const content = (

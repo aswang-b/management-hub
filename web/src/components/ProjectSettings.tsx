@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GRID_WIDTH, type Project } from "../../../shared/types.ts";
+import { GRID_WIDTH, SIDE_GRID_WIDTH, SIDE_ZONES, type Project, type Sides } from "../../../shared/types.ts";
 import { Modal } from "./Modal.tsx";
 
 export function ProjectSettings({
@@ -9,18 +9,19 @@ export function ProjectSettings({
   onClose,
 }: {
   project: Project;
-  onSave: (patch: { name: string; gridWidth: number }) => void;
+  onSave: (patch: { name: string; gridWidth: number; sides: Sides }) => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(project.name);
   const [gridWidth, setGridWidth] = useState(project.gridWidth);
+  const [sides, setSides] = useState(project.sides);
   return (
     <Modal title="Project settings" onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onSave({ name, gridWidth });
+          onSave({ name, gridWidth, sides });
         }}
       >
         <label className="field">
@@ -42,6 +43,26 @@ export function ProjectSettings({
             More squares make every tool smaller. Between {GRID_WIDTH.min} and {GRID_WIDTH.max}. Tools that no longer fit move left.
           </small>
         </label>
+        {SIDE_ZONES.map((s) => (
+          <label className="field" key={s}>
+            <span>
+              {s === "left" ? "Left" : "Right"} side grid width: <strong>{sides[s].gridWidth}</strong> square{sides[s].gridWidth === 1 ? "" : "s"}
+            </span>
+            <input
+              type="range"
+              min={SIDE_GRID_WIDTH.min}
+              max={SIDE_GRID_WIDTH.max}
+              value={sides[s].gridWidth}
+              onChange={(e) => setSides({ ...sides, [s]: { ...sides[s], gridWidth: Number(e.target.value) } })}
+            />
+            {s === "right" && (
+              <small>
+                Used when a side is set to Grid (the switch above it in builder mode). Between {SIDE_GRID_WIDTH.min} and{" "}
+                {SIDE_GRID_WIDTH.max}. Tools that no longer fit move left.
+              </small>
+            )}
+          </label>
+        ))}
         <div className="form-actions">
           <button
             type="button"

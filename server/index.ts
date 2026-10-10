@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { cleanScratch } from "../shared/types.ts";
 
 // Settings and tokens live in .env (HUB_ENV_FILE points elsewhere, e.g. for a test run).
 const ENV_FILE = process.env.HUB_ENV_FILE || ".env";
@@ -86,21 +87,9 @@ api.put("/projects/:id/scratch/:side", async (c) => {
   const projectId = Number(c.req.param("id"));
   if (!db.isSideZone(side)) return c.json({ error: "Unknown side" }, 400);
   if (!db.getProject(projectId)) return c.json({ error: "Project not found" }, 404);
-  const b = await c.req.json();
-  const num = (n: unknown) => typeof n === "number" && Number.isFinite(n);
-  const texts = Array.isArray(b?.texts) ? b.texts : undefined;
-  const strokes = Array.isArray(b?.strokes) ? b.strokes : undefined;
-  if (
-    !texts || !strokes ||
-    !texts.every((t: any) => typeof t?.id === "string" && num(t.x) && num(t.y) && typeof t.text === "string") ||
-    !strokes.every((s: any) => typeof s?.id === "string" && Array.isArray(s.points) && s.points.every(num))
-  ) {
-    return c.json({ error: "Expected a scratchpad (texts and strokes)" }, 400);
-  }
-  db.saveScratch(projectId, side, {
-    texts: texts.map(({ id, x, y, text }: any) => ({ id, x, y, text })),
-    strokes: strokes.map(({ id, points }: any) => ({ id, points })),
-  });
+  const scratch = cleanScratch(await c.req.json());
+  if (!scratch) return c.json({ error: "Expected a scratchpad (texts and strokes)" }, 400);
+  db.saveScratch(projectId, side, scratch);
   return c.json({ ok: true });
 });
 api.put("/projects/:id/layout", async (c) => {

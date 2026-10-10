@@ -47,9 +47,58 @@ export function normalizeSides(v: unknown, base?: Sides): Sides {
 
 /** What's typed and drawn on a scratchpad. Positions are in pixels from its top-left corner. */
 export interface Scratch {
-  texts: { id: string; x: number; y: number; text: string }[];
-  /** Each stroke is a list of points, flattened: [x1, y1, x2, y2, ...]. */
-  strokes: { id: string; points: number[] }[];
+  texts: ScratchText[];
+  strokes: ScratchStroke[];
+}
+export interface ScratchText {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  /** Font size in pixels (default 14). */
+  size?: number;
+  bold?: boolean;
+  italic?: boolean;
+  /** "#rrggbb" (default black). */
+  color?: string;
+}
+export interface ScratchStroke {
+  id: string;
+  /** The points, flattened: [x1, y1, x2, y2, ...]. */
+  points: number[];
+  /** "#rrggbb" (default black). */
+  color?: string;
+  /** Line width in pixels (default 2). */
+  width?: number;
+}
+export const SCRATCH_LIMITS = { size: { min: 8, max: 96 }, width: { min: 1, max: 40 } } as const;
+
+/** Keeps only valid scratchpad content (from a request); undefined if it isn't a scratchpad at all. */
+export function cleanScratch(v: unknown): Scratch | undefined {
+  const o = v as Record<string, unknown> | null;
+  if (!o || !Array.isArray(o.texts) || !Array.isArray(o.strokes)) return undefined;
+  const num = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+  const color = (c: unknown) => (typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : undefined);
+  const within = (n: unknown, r: { min: number; max: number }) => (num(n) ? Math.min(r.max, Math.max(r.min, n)) : undefined);
+  const texts: ScratchText[] = [];
+  for (const t of o.texts as any[]) {
+    if (typeof t?.id !== "string" || !num(t.x) || !num(t.y) || typeof t.text !== "string") return undefined;
+    const size = within(t.size, SCRATCH_LIMITS.size);
+    texts.push({
+      id: t.id, x: t.x, y: t.y, text: t.text,
+      ...(size !== undefined && { size }),
+      ...(t.bold === true && { bold: true }),
+      ...(t.italic === true && { italic: true }),
+      ...(color(t.color) && { color: color(t.color) }),
+    });
+  }
+  const strokes: ScratchStroke[] = [];
+  for (const s of o.strokes as any[]) {
+    if (typeof s?.id !== "string" || !Array.isArray(s.points) || !s.points.every(num)) return undefined;
+    const width = within(s.width, SCRATCH_LIMITS.width);
+    strokes.push({ id: s.id, points: s.points, ...(color(s.color) && { color: color(s.color) }), ...(width !== undefined && { width }) });
+  }
+  return { texts, strokes };
 }
 
 export interface Tool {

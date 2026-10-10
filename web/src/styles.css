@@ -112,8 +112,6 @@ main { padding: 16px; }
 .workspace { min-width: 0; }
 .side { min-width: 0; }
 .side-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.side-width { display: flex; align-items: center; border: var(--thin); font-weight: 600; font-size: 13px; }
-.side-width span { min-width: 20px; text-align: center; }
 .side-note { font-size: 12px; }
 /* Two or three buttons joined into one switch; the chosen one is inverted. */
 .seg { display: inline-flex; border: var(--thin); }
@@ -121,7 +119,7 @@ main { padding: 16px; }
 .seg button + button { border-left: var(--thin); }
 .seg button.on { background: var(--ink); color: var(--paper); }
 .seg button:hover:not(.on) { background: var(--faint); }
-.seg button:focus-visible, .side-width button:focus-visible, .scratch-bar .icon-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
+.seg button:focus-visible, .scratch-bar .icon-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
 .seg button.on:focus-visible { outline-color: var(--paper); }
 @media (forced-colors: active) {
   .seg button.on { outline: 2px solid Highlight; outline-offset: -3px; }
@@ -130,35 +128,71 @@ main { padding: 16px; }
 /* ---- Scratchpad (a side zone to type and draw on) */
 .scratchpad { position: relative; }
 .scratch-bar {
-  position: sticky; top: 56px; z-index: 5; display: flex; align-items: center; gap: 6px;
-  margin-bottom: 4px; opacity: 0.35; transition: opacity 0.15s;
+  position: sticky; top: 56px; z-index: 5; display: flex; flex-direction: column; gap: 4px;
+  margin-bottom: 4px; opacity: 0.4; transition: opacity 0.15s;
 }
 .scratchpad:hover .scratch-bar, .scratch-bar:focus-within { opacity: 1; }
-.scratch-bar .seg, .scratch-bar .icon-btn { background: var(--paper); }
-.scratch-surface { position: relative; border: 1px dashed #c8c8c8; touch-action: none; }
-.scratch-surface.scratch-text { cursor: text; }
-.scratch-surface.scratch-draw { cursor: crosshair; }
-.scratch-surface.scratch-erase { cursor: cell; }
+.scratch-row { display: flex; align-items: center; gap: 6px; min-height: 26px; }
+.scratch-bar .seg, .scratch-bar .icon-btn, .scratch-size { background: var(--paper); }
+.scratch-bar .seg button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 24px; padding: 0 6px; font-size: 13px; }
+.scratch-t { font-family: Georgia, serif; font-weight: 700; }
+.scratch-size { border: var(--thin); height: 26px; padding: 0 4px; font-size: 12px; }
+.scratch-size:focus-visible { outline: 2px solid var(--ink); outline-offset: -1px; }
+.scratch-width { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.scratch-width input { flex: 1; min-width: 40px; accent-color: var(--ink); }
+.scratch-num { font-size: 11px; font-variant-numeric: tabular-nums; min-width: 30px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Drawing stays inside the scratchpad: points are kept within its edges and the ink layer clips. */
+.scratch-surface { position: relative; border: 1px dashed #c8c8c8; touch-action: none; cursor: default; }
+.scratch-surface.mode-text { cursor: text; }
 .scratch-hint { position: absolute; top: 12px; left: 0; right: 0; text-align: center; font-size: 12px; pointer-events: none; }
-.scratch-ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.scratch-ink .ink { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.scratch-ink .ink-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; }
+.scratch-ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
+.scratch-ink .ink { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.scratch-ink .ink-hit { fill: none; stroke: transparent; pointer-events: stroke; }
 .scratch-note { position: absolute; display: flex; align-items: flex-start; max-width: calc(100% - 4px); }
 .scratch-text {
   field-sizing: content; min-width: 2ch; max-width: 100%; resize: none; overflow: hidden;
   border: 1px solid transparent; background: transparent; padding: 2px 4px;
   font: 14px/1.4 var(--font); color: var(--ink); outline: none;
 }
-.scratch-text:focus { border-color: var(--ink); background: var(--paper); }
-.scratch-draw .scratch-note, .scratch-draw .scratch-text { pointer-events: none; }
-.scratch-erase .scratch-text { pointer-events: none; }
-.scratch-erase .scratch-note:hover { outline: 1px dashed var(--ink); }
-/* A grip to drag a text box around, shown when pointing at it. */
+.mode-select .scratch-note { cursor: move; }
+.mode-select .scratch-text:not(:focus) { cursor: inherit; }
+.scratch-note.selected .scratch-text { border-color: var(--mid); border-style: dashed; }
+.scratch-text:focus { border-color: var(--ink); border-style: solid; background: var(--paper); }
+.mode-draw .scratch-note, .mode-draw .scratch-text { pointer-events: none; }
+.mode-erase .scratch-text { pointer-events: none; }
+.mode-erase .scratch-note:hover { outline: 1px dashed var(--ink); }
+/* A grip to drag a text box around in type mode, shown when pointing at it. */
 .scratch-grip {
   position: absolute; left: -14px; top: 3px; width: 12px; font-size: 12px; line-height: 1;
   color: var(--mid); cursor: move; opacity: 0; touch-action: none;
 }
 .scratch-note:hover .scratch-grip, .scratch-note:focus-within .scratch-grip { opacity: 1; }
+
+/* ---- Colour picker (the colours are content, so they're allowed here) */
+.color-picker { position: relative; display: inline-flex; }
+.color-swatch { width: 26px; height: 26px; border: var(--thin); box-shadow: inset 0 0 0 2px var(--paper); flex-shrink: 0; }
+.color-swatch.small { width: 22px; height: 22px; }
+.color-swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.color-panel {
+  position: absolute; top: calc(100% + 4px); z-index: 30; width: 200px; padding: 8px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--paper); border: var(--line); box-shadow: 4px 4px 0 var(--ink);
+}
+.color-panel-left { left: 0; }
+.color-panel-right { right: 0; }
+.color-sv { position: relative; height: 120px; border: var(--thin); cursor: crosshair; touch-action: none; }
+.color-hue {
+  position: relative; height: 14px; border: var(--thin); cursor: ew-resize; touch-action: none;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.color-sv i, .color-hue i { position: absolute; pointer-events: none; border: 2px solid #fff; outline: 1px solid #000; }
+.color-sv i { width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50% !important; }
+.color-hue i { top: -3px; bottom: -3px; width: 6px; transform: translateX(-50%); }
+.color-row { display: flex; align-items: center; gap: 6px; }
+.color-hex { flex: 1; min-width: 0; border: var(--thin); padding: 3px 6px; font-family: var(--mono); font-size: 12px; }
+.color-hex:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
 .empty-state { border: 2px dashed var(--ink); padding: 40px 20px; text-align: center; max-width: 1200px; margin: 0 auto; }
 .grid-area { position: relative; }
 .grid-cells { position: absolute; inset: 0; display: grid; pointer-events: none; }

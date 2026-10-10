@@ -9,7 +9,9 @@ of Node-only and browser-only APIs so both sides can run it.
   - `Project`, `Tool` (category, type, `zone`, position/size, `config`, `data`), `GRID_WIDTH` (4–12).
   - Zones: `Zone` (`main` / `left` / `right`), `Sides` (each side's `mode`, grid
     or scratchpad, and `gridWidth`, `SIDE_GRID_WIDTH` 1–6), `normalizeSides`
-    (defaults and limits), `Scratch` (texts and strokes, in pixels).
+    (defaults and limits), `Scratch` (texts with size/bold/italic/colour, strokes
+    with colour/width, in pixels), `cleanScratch` (the server's check of a saved
+    scratchpad; limits in `SCRATCH_LIMITS`).
   - Plugin view: `PluginView`, `PluginItem`, `PluginAction`, `Tone`, `PluginResult`.
   - Plugin metadata: `PluginMeta`, `EnvVar` (token `key`, `help`, `url`, `steps`),
     `PluginConfigField` (`text` / `number` / `select`, `timestamped`).

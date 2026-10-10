@@ -77,7 +77,9 @@ export async function linkInfo(url: string): Promise<{ title: string; iconUrl?: 
 export async function favicon(url: string): Promise<{ body: Uint8Array; type: string } | undefined> {
   const key = `icon:${url}`;
   const cached = cacheGet(key, 7 * DAY);
-  if (cached) return cached.value ? { body: cached.value as Uint8Array, type: cached.type } : undefined;
+  if (cached?.value) return { body: cached.value as Uint8Array, type: cached.type };
+  // "No icon" is remembered for a day only, so an icon the site adds later shows up.
+  if (cached && cacheGet(key, DAY)) return undefined;
 
   const { iconUrl } = await linkInfo(url);
   const candidates = [iconUrl, new URL("/favicon.ico", url).toString()].filter((u, i, a) => u && a.indexOf(u) === i) as string[];

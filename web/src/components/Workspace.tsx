@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { useContainerWidth, type Layout } from "react-grid-layout";
 import {
-  SIDE_GRID_WIDTH, SIDE_ZONES, firstFreeSpot, overlaps, refit,
+  SIDE_ZONES, firstFreeSpot, overlaps, refit,
   type Project, type SideZone, type Sides, type Tool, type Zone,
 } from "../../../shared/types.ts";
 import { api } from "../api.ts";
@@ -42,7 +42,7 @@ export function Workspace({
   toolsRef?: RefObject<Tool[] | undefined>;
   /** Called just before a builder-mode change, so it can be undone. */
   onBeforeChange?: () => void;
-  /** Saves new side settings (grid or scratchpad, side grid width). */
+  /** Saves new side settings (grid or scratchpad; widths are in project settings). */
   onSidesChange: (sides: Sides) => void;
 }) {
   const [tools, setTools] = useState<Tool[]>([]);
@@ -270,7 +270,7 @@ export function Workspace({
   );
 
   const side = (s: SideZone) => {
-    const { mode, gridWidth } = sides[s];
+    const { mode } = sides[s];
     const kept = inZone(s).length;
     return (
       <div className={`side side-${s}`} key={s}>
@@ -284,17 +284,6 @@ export function Workspace({
                 Scratchpad
               </button>
             </div>
-            {mode === "grid" && (
-              <div className="side-width" title="Width of this grid, in squares">
-                <button className="icon-btn" aria-label="Narrower" disabled={gridWidth <= SIDE_GRID_WIDTH.min} onClick={() => setSide(s, { gridWidth: gridWidth - 1 })}>
-                  −
-                </button>
-                <span>{gridWidth}</span>
-                <button className="icon-btn" aria-label="Wider" disabled={gridWidth >= SIDE_GRID_WIDTH.max} onClick={() => setSide(s, { gridWidth: gridWidth + 1 })}>
-                  +
-                </button>
-              </div>
-            )}
           </div>
         )}
         {mode === "grid" ? grid(s) : <Scratchpad projectId={project.id} side={s} />}

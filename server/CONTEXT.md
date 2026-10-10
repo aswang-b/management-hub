@@ -9,7 +9,7 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
 - `db.ts`: SQLite through `node:sqlite`. Tables `projects` (with `sides`: JSON
   side settings), `tools` (with `zone`: main/left/right), `scratchpads` (one row
   per project side: typed text and drawn strokes as JSON), `cache` (favicons
-  and link titles). Columns added later are created at startup if missing.
+  and link titles; a site with no icon is retried after a day). Columns added later are created at startup if missing.
   Helpers: list/get/create/update/delete for projects and tools, `saveLayout`,
   `getScratch`/`saveScratch`, `cacheGet`/`cacheSet`, `clampWidth`.
   `updateProject` refits only the tools of a grid that got narrower.
