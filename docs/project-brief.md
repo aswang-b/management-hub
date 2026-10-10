@@ -217,9 +217,9 @@ the phone, but puts the hub on a public address behind a login, which is more
 to get right. It's also the route to take later if webhooks are wanted.
 
 **Built?** Yes: phone layout, home-screen app details (manifest with PNG
-icons) and the Tailscale steps in the README. On Windows the hub can run as a
-hidden task started at sign-in (`npm run app:install`) and be installed from
-Edge as an app with its own window. **Not yet:** offline caching (a "service worker") so the app
+icons) and the Tailscale steps in the README. On Windows, `Install Management Hub.cmd`
+runs the hub as a hidden task started at sign-in and adds Start menu/desktop
+shortcuts that open it in its own window. **Not yet:** offline caching (a "service worker") so the app
 opens instantly with the last-seen data when the computer is off.
 
 ---

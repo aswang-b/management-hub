@@ -33,8 +33,10 @@ More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
   `components/Workspace.tsx` is the grid and builder mode (other tools make
   room while one is dragged: `makeRoom` in `shared/types.ts`); `useUndo.ts`
   is builder mode's Undo/Redo/Revert; `components/Tokens.tsx` is the token UI.
-- `scripts/windows-app.ps1` (`npm run app:*`): runs the hub as a hidden Windows
-  task at sign-in (`scripts/run-hidden.cmd`, output in `data/hub.log`). When it's
+- `scripts/windows-app.ps1` (`npm run app:*`, and the `Install`/`Uninstall Management Hub.cmd`
+  files): runs the hub as a hidden Windows task at sign-in (`scripts/run-hidden.cmd`,
+  output in `data/hub.log`) and adds Start menu/desktop shortcuts that run
+  `scripts/open-window.ps1` (Chrome or Edge `--app` window, own profile). When it's
   installed it holds the port, so restart it with `npm run app:restart`, not `npm start`.
 - `shared/types.ts`: shared types, including `PluginView`. `shared/metrics.ts`:
   analytics types, time ranges, value formatting.

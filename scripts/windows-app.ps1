@@ -1,6 +1,8 @@
 # Runs the hub in the background on Windows: a task starts it hidden each
-# time you sign in. Used by `npm run app:install`, `app:restart`,
-# `app:stop`, `app:status` and `app:uninstall`.
+# time you sign in, and "Management Hub" shortcuts (Start menu, desktop) open
+# it in its own window. Used by `npm run app:install`, `app:restart`,
+# `app:stop`, `app:status` and `app:uninstall`, and by the Install/Uninstall
+# .cmd files in the hub folder.
 param([Parameter(Mandatory)][ValidateSet("install", "restart", "stop", "status", "uninstall")][string]$Command)
 
 $ErrorActionPreference = "Stop"
@@ -34,6 +36,25 @@ function Stop-Hub {
   }
 }
 
+$Shortcuts = @(
+  (Join-Path ([Environment]::GetFolderPath("Programs")) "Management Hub.lnk"),
+  (Join-Path ([Environment]::GetFolderPath("Desktop")) "Management Hub.lnk")
+)
+
+# The shortcuts run open-window.ps1 through a hidden console, so no window flashes.
+function Add-Shortcuts {
+  $shell = New-Object -ComObject WScript.Shell
+  foreach ($path in $Shortcuts) {
+    $s = $shell.CreateShortcut($path)
+    $s.TargetPath = "$env:WINDIR\System32\conhost.exe"
+    $s.Arguments = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$Root\scripts\open-window.ps1`""
+    $s.WorkingDirectory = $Root
+    $s.IconLocation = "$Root\scripts\hub.ico,0"
+    $s.Description = "Open the Management Hub"
+    $s.Save()
+  }
+}
+
 function Build-Page {
   Write-Host "Building the page..."
   npm run build --silent
@@ -59,7 +80,9 @@ switch ($Command) {
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
       -Description "Runs the Management Hub ($Root) in the background." -Force | Out-Null
+    Add-Shortcuts
     Write-Host "Installed: the hub now starts by itself when you sign in to Windows."
+    Write-Host "Open it from 'Management Hub' in the Start menu or on your desktop."
     Stop-Hub
     Start-Hub
   }
@@ -81,6 +104,8 @@ switch ($Command) {
   "uninstall" {
     Stop-Hub
     if (Get-Task) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
-    Write-Host "Removed: the hub no longer starts by itself. 'npm start' still works."
+    $Shortcuts | Where-Object { Test-Path $_ } | Remove-Item
+    Write-Host "Removed: the hub no longer starts by itself and its shortcuts are gone."
+    Write-Host "Your projects and tokens are kept (data\hub.db and .env). 'npm start' still works."
   }
 }

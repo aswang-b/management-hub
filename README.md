@@ -97,27 +97,38 @@ cp .env.example .env     # Windows: copy .env.example .env
 npm start
 ```
 
-Then open <http://localhost:8787>.
+Then open <http://localhost:8787>. On Windows you can instead double-click
+`Install Management Hub.cmd` (see below), which does all of this for you.
 
 ## Running it as a Windows app
 
 Instead of keeping a terminal open with `npm start`, the hub can run quietly
-in the background and open in its own window like any other app:
+in the background and open in its own window like any other app.
 
-1. In the hub folder, run `npm run app:install`. From now on the hub starts
-   by itself, hidden, whenever you sign in to Windows.
-2. Open <http://localhost:8787> in Microsoft Edge, then choose **⋯ → Apps →
-   Install this site as an app** (in Chrome: the install icon at the right of
-   the address bar). The hub gets its own window, a Start menu entry, and can
-   be pinned to the taskbar.
+**Double-click `Install Management Hub.cmd`** in the hub folder. It sets up
+everything (first time: installs the packages and creates `.env`), then:
+
+- the hub starts by itself, hidden, whenever you sign in to Windows;
+- **Management Hub** appears in the Start menu and on your desktop. It opens
+  the hub in its own window, with no tabs or address bar. Right-click it in
+  the Start menu to **Pin to taskbar**.
+
+The window uses Chrome (or Edge if Chrome isn't installed) with a separate
+profile just for the hub, so it never mixes with your normal browsing and you
+don't need to use either as your browser. If the hub isn't running when you
+open the window, it starts it.
+
+Run the installer again after updating the code. **`Uninstall Management
+Hub.cmd`** removes the shortcuts and stops the hub starting at sign-in; your
+projects and tokens are kept. The same things are available as commands:
 
 | Command | What it does |
 |---|---|
-| `npm run app:install` | Start the hub now and every time you sign in |
+| `npm run app:install` | What the installer does: start the hub now and at every sign-in, add the shortcuts |
 | `npm run app:restart` | Rebuild the page and restart the hub, e.g. after updating the code |
 | `npm run app:stop` | Stop it until you next sign in (or restart it) |
 | `npm run app:status` | Say whether it's installed and running |
-| `npm run app:uninstall` | Stop it and stop starting it at sign-in |
+| `npm run app:uninstall` | Stop it, stop starting it at sign-in, remove the shortcuts |
 
 If the hub doesn't open, `data/hub.log` holds what it printed (the run
 before is in `data/hub.previous.log`). While the background app runs,

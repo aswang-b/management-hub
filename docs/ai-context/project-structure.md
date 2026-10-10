@@ -20,6 +20,7 @@
 ## File tree
 ```
 .env.example            tokens each plugin needs (copy to .env)
+Install Management Hub.cmd / Uninstall Management Hub.cmd   double-click installer (calls windows-app.ps1)
 server/
   index.ts              API routes under /api, host/origin guard, serves web/dist
   db.ts                 SQLite tables: projects, tools, cache
@@ -37,6 +38,8 @@ server/
 scripts/
   windows-app.ps1       npm run app:*: registers/starts/stops the "Management Hub" Windows task
   run-hidden.cmd        what the task runs (under conhost --headless): server, output to data/hub.log
+  open-window.ps1       what the shortcuts run: start the hub if needed, open a Chrome/Edge --app window
+  hub.ico               shortcut icon
 shared/                 used by server and page (see shared/CONTEXT.md)
   types.ts              Project, Tool, PluginView, grid helpers (makeRoom, refit)
   metrics.ts            analytics types, ranges, value formatting
