@@ -6,6 +6,9 @@ The React page. Built by Vite into `web/dist`, which the server serves.
 - `App.tsx`: loads projects and plugins, project switcher (URL `#/p/<id>`),
   builder-mode toggle, project settings.
 - `api.ts`: small fetch wrapper for `/api`.
+- `externalLinks.ts`: on localhost, clicks on links to other sites go to
+  `POST /open-url` so they open in the default browser, not in Chrome (the
+  installed app's window is Chrome's). Falls back to `window.open`.
 - `components/Workspace.tsx`: the zones: main grid (at most 1200 px) and a side
   each way, shown when each side gets at least 160 px (measured without the
   palette, so building narrows the main grid instead of hiding the sides). It

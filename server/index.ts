@@ -13,7 +13,7 @@ if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 const db = await import("./db.ts");
 const { plugins, getPlugin, pluginMeta, runLoad, runAction, clearCache, tokenKeys } = await import("./plugins/index.ts");
 const { saveToken } = await import("./secrets.ts");
-const { linkInfo, favicon, isLocalPath, openLocal } = await import("./links.ts");
+const { linkInfo, favicon, isLocalPath, openLocal, openUrl } = await import("./links.ts");
 const { analytics, listSeries } = await import("./metrics.ts");
 const { collectAll, lastRun, startCollector } = await import("./collector.ts");
 
@@ -169,6 +169,14 @@ api.post("/open", async (c) => {
   const { target } = await c.req.json();
   if (!isLocalPath(String(target))) return c.json({ ok: false, error: "Not a local file path" }, 400);
   return c.json(openLocal(String(target)));
+});
+// Opens a link in this computer's default browser. Only for the page used on
+// this computer: from a phone (through Tailscale) it would open on the PC.
+api.post("/open-url", async (c) => {
+  const host = (c.req.header("host") ?? "").replace(/:\d+$/, "");
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) return c.json({ ok: false, error: "Only available on this computer" }, 403);
+  const { url } = await c.req.json().catch(() => ({ url: undefined }));
+  return c.json(openUrl(String(url ?? "")));
 });
 
 app.route("/api", api);

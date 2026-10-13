@@ -26,6 +26,24 @@ export function openLocal(target: string): { ok: boolean; error?: string } {
   return { ok: true };
 }
 
+/** Opens a web address in this computer's default browser (whatever browser the hub's window is). */
+export function openUrl(target: string): { ok: boolean; error?: string } {
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return { ok: false, error: "Not a web address" };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false, error: "Only http and https addresses can be opened" };
+  // rundll32's URL handler hands the address to the default browser without a shell, so characters like & are safe.
+  const [cmd, args] =
+    process.platform === "darwin" ? ["open", [url.href]]
+    : process.platform === "win32" ? ["rundll32.exe", ["url.dll,FileProtocolHandler", url.href]]
+    : ["xdg-open", [url.href]];
+  spawn(cmd, args, { detached: true, stdio: "ignore" }).unref();
+  return { ok: true };
+}
+
 async function fetchPage(url: string): Promise<{ html: string; finalUrl: string } | undefined> {
   try {
     const res = await fetch(url, {

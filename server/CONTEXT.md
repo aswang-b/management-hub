@@ -14,7 +14,8 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
   `getScratch`/`saveScratch`, `cacheGet`/`cacheSet`, `clampWidth`.
   `updateProject` refits only the tools of a grid that got narrower.
 - `links.ts`: `linkInfo` (site title + icon), `favicon`, `openLocal`
-  (open a local file or folder from a link tile).
+  (open a local file or folder from a link tile), `openUrl` (http/https only,
+  via `rundll32 url.dll,FileProtocolHandler` on Windows, no shell).
 - `secrets.ts`: `saveToken` writes a plugin token into `.env` (keeping other
   lines) and into `process.env`, so it works without a restart. `tokenProblem`
   refuses pasted text with spaces or odd characters.
@@ -48,6 +49,7 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
 | `POST /metrics/collect` | Collect plugin numbers now |
 | `GET /tools/:id/analytics` | What an analytics tile shows |
 | `GET /link-info`, `GET /favicon`, `POST /open` | Link tile helpers |
+| `POST /open-url` | Open a web address in this computer's default browser (only for requests to localhost) |
 
 ## Patterns
 - Tokens are read only on the server (`ctx.secret()`); responses never include them.

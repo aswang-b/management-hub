@@ -42,5 +42,6 @@ export const api = {
   analytics: (toolId: string) => call<AnalyticsResult>("GET", `/tools/${toolId}/analytics`),
 
   linkInfo: (url: string) => call<{ title: string; local?: boolean; error?: string }>("GET", `/link-info?url=${encodeURIComponent(url)}`),
+  openUrl: (url: string) => call<{ ok: boolean; error?: string }>("POST", "/open-url", { url }),
   openLocal: (target: string) => call<{ ok: boolean; error?: string }>("POST", "/open", { target }),
 };

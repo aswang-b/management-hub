@@ -142,7 +142,8 @@ part of the header. (If a title bar still shows, click the **˄** button in it
 to hide it.)
 
 Chrome needs to be installed for this, but you don't need to use it as your
-browser.
+browser: links you click in the hub open in your **default browser** (whichever
+one Windows is set to use), not in Chrome. On your phone, links open as usual.
 
 Run the installer again after updating the code. **`Uninstall Management
 Hub.cmd`** stops the hub starting at sign-in; your projects and tokens are
