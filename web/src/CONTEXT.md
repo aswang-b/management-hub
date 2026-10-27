@@ -18,7 +18,15 @@ The React page. Built by Vite into `web/dist`, which the server serves.
   On phones (< 640 px) links sit 4 per row and everything else is full width;
   side-grid tools follow the main grid's, scratchpads aren't shown.
 - `components/ZoneGrid.tsx`: one grid (`react-grid-layout`) with its own width
-  and the drag compactor; reports drag stops and palette drops to Workspace.
+  and the drag compactor; reports drag starts, moves, stops and palette drops
+  to Workspace.
+- Dragging between grids (the library can't): Workspace's `trackDrag` finds
+  the other `.grid-area[data-zone]` under the pointer and the square under the
+  tile's corner (`cross`, mirrored in a ref because a drop can come before
+  the next render). That grid shows `makeRoom` positions and a `ghost`; the
+  source grid stops making room (`draggingOut`). On drop, `endDrag` moves the
+  tool (zone + spot) and saves the target grid's layout; otherwise it saves
+  the in-grid drag as before.
 - `components/Scratchpad.tsx`: a side used as a scratchpad. Modes: pointer
   (click text to edit, drag to move), type (adds a text box on click, not
   pointer-down: the browser's mouse-down focus would close it), draw (pointer

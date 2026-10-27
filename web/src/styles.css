@@ -200,6 +200,11 @@ main { padding: 16px; }
 .react-grid-layout { position: relative; }
 .react-grid-item.react-grid-placeholder { background: var(--ink) !important; opacity: 0.15 !important; }
 .react-grid-item.dropping { opacity: 0.6; }
+/* Dragging a tool to another grid: it stays on top, its old grid stops making
+   room, and the grid it's over shows where it will land. */
+.react-grid-item.react-draggable-dragging { z-index: 40; }
+.grid-area.dragging-out .react-grid-placeholder { display: none; }
+.grid-ghost { position: absolute; background: var(--ink); opacity: 0.15; pointer-events: none; }
 
 /* ---- Tiles */
 .tile { position: relative; width: 100%; height: 100%; border: var(--line); background: var(--paper); overflow: hidden; }

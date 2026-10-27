@@ -32,8 +32,9 @@ The original request, what's built so far and what's planned are in
 
   In builder mode, the switch above each side turns it into a **Grid**
   instead: another space for tools. Its width (1 to 6 squares) is set in
-  project settings (⚙). Drag tools from the left panel onto it, or move a tool
-  between grids with **⇄** on the tool. Switching a side back to
+  project settings (⚙). Drag tools from the left panel onto it, drag a tool
+  from one grid straight onto another (the grid you're over shows where it
+  will land, and its tools make room), or move a tool with **⇄** on the tool. Switching a side back to
   a scratchpad keeps its tools (and the scratchpad keeps its writing while
   it's a grid). The sides only show when the window is wide enough; on a phone,
   tools on side grids are listed after the main grid's.

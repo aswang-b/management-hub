@@ -1,19 +1,19 @@
 // A project's workspace: the main grid of tools, with a space on each side
 // that is either another grid or a scratchpad. In builder mode tools can be
-// added, moved (within a grid, or to another grid), resized (to their allowed
-// sizes), configured and removed, and each side can be switched between grid
-// and scratchpad.
-import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
+// added, moved (within a grid, or dragged or sent with ⇄ to another grid),
+// resized (to their allowed sizes), configured and removed, and each side can
+// be switched between grid and scratchpad.
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useContainerWidth, type Layout } from "react-grid-layout";
 import {
-  SIDE_ZONES, firstFreeSpot, overlaps, refit,
+  SIDE_ZONES, firstFreeSpot, makeRoom, overlaps, refit,
   type Project, type SideZone, type Sides, type Tool, type Zone,
 } from "../../../shared/types.ts";
 import { api } from "../api.ts";
 import { defKey, type Size, type ToolDef } from "../tools/registry.tsx";
 import { Palette, SizeShape, dragging } from "./Palette.tsx";
 import { ToolSettings } from "./ToolSettings.tsx";
-import { ZoneGrid } from "./ZoneGrid.tsx";
+import { GAP, ZoneGrid } from "./ZoneGrid.tsx";
 import { Scratchpad } from "./Scratchpad.tsx";
 import { isLocal } from "../tools/LinkTool.tsx";
 
@@ -49,6 +49,15 @@ export function Workspace({
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<Tool>();
   const [menu, setMenu] = useState<{ id: string; kind: "size" | "move" }>();
+  // A tool being dragged, and the other grid it's over (if any).
+  type Cross = { id: string; from: Zone; to?: { zone: Zone; x: number; y: number } };
+  const [cross, setCrossState] = useState<Cross>();
+  // Kept in step straight away: a drop can come before the next redraw.
+  const crossRef = useRef<Cross>(undefined);
+  const setCross = (c: Cross | undefined) => {
+    crossRef.current = c;
+    setCrossState(c);
+  };
   const { width, containerRef, mounted } = useContainerWidth();
 
   const { sides } = project;
@@ -108,6 +117,59 @@ export function Workspace({
       setTools(next);
       persistLayout(next);
     }
+  };
+
+  // ---- Dragging a tool to another grid
+  const startDrag = (zone: Zone) => (id: string) => setCross({ id, from: zone });
+
+  /** Which other grid the pointer is over, and the square the tile's top-left corner is on there. */
+  const trackDrag = (e: Event, el: HTMLElement | null) => {
+    const c = crossRef.current;
+    const tool = c && tools.find((t) => t.id === c.id);
+    if (!c || !tool) return;
+    const p = "touches" in e ? (e as TouchEvent).touches[0] : (e as MouseEvent);
+    if (!p) return;
+    let to: NonNullable<typeof c.to> | undefined;
+    for (const area of document.querySelectorAll<HTMLElement>(".grid-area[data-zone]")) {
+      const zone = area.dataset.zone as Zone;
+      const r = area.getBoundingClientRect();
+      if (zone === c.from || p.clientX < r.left || p.clientX > r.right || p.clientY < r.top || p.clientY > r.bottom) continue;
+      const cols = colsOf(zone);
+      const w = Math.min(tool.w, cols);
+      const step = (r.width - GAP * (cols - 1)) / cols + GAP;
+      const corner = el?.getBoundingClientRect() ?? { left: p.clientX, top: p.clientY };
+      to = {
+        zone,
+        x: Math.min(cols - w, Math.max(0, Math.round((corner.left - r.left) / step))),
+        y: Math.max(0, Math.round((corner.top - r.top) / step)),
+      };
+    }
+    if (to?.zone !== c.to?.zone || to?.x !== c.to?.x || to?.y !== c.to?.y) setCross({ ...c, to });
+  };
+
+  /** Where the tools of `zone` sit while a tool is dragged over it from another grid. */
+  const arrival = (zone: Zone, c = cross) => {
+    const tool = c?.to?.zone === zone ? tools.find((t) => t.id === c.id) : undefined;
+    if (!c?.to || !tool) return undefined;
+    const cols = colsOf(zone);
+    const rect = { x: c.to.x, y: c.to.y, w: Math.min(tool.w, cols), h: tool.h };
+    const room = makeRoom(inZone(zone).map((t) => ({ ...t, i: t.id })), { ...tool, ...rect, i: tool.id }, cols);
+    return { rect, others: room.filter((t) => t.i !== tool.id).map(({ i: _, ...t }) => t as Tool) };
+  };
+
+  const endDrag = (layout: Layout) => {
+    const c = crossRef.current;
+    setCross(undefined);
+    const landing = c?.to && arrival(c.to.zone, c);
+    if (!c?.to || !landing) return saveDragResult(layout);
+    // Dropped on another grid: the tool moves there, the tools in its way moved aside.
+    onBeforeChange();
+    const zone = c.to.zone;
+    const moved = new Map(landing.others.map((t) => [t.id, t]));
+    const next = tools.map((t) => (t.id === c.id ? { ...t, zone, ...landing.rect } : moved.get(t.id) ?? t));
+    setTools(next);
+    api.updateTool(c.id, { zone, ...landing.rect });
+    persistLayout(landing.others);
   };
 
   async function add(def: ToolDef, size: Size, zone: Zone, at?: { x: number; y: number }, current = tools, record = true) {
@@ -257,17 +319,25 @@ export function Workspace({
     );
   };
 
-  const grid = (zone: Zone) => (
-    <ZoneGrid
-      key={`${zone}:${colsOf(zone)}`}
-      tools={inZone(zone)}
-      cols={colsOf(zone)}
-      building={building}
-      tile={tile}
-      onDragStop={saveDragResult}
-      onDrop={drop(zone)}
-    />
-  );
+  const grid = (zone: Zone) => {
+    const incoming = arrival(zone);
+    return (
+      <ZoneGrid
+        key={`${zone}:${colsOf(zone)}`}
+        zone={zone}
+        tools={incoming?.others ?? inZone(zone)}
+        cols={colsOf(zone)}
+        building={building}
+        tile={tile}
+        onDragStart={startDrag(zone)}
+        onDrag={trackDrag}
+        onDragStop={endDrag}
+        onDrop={drop(zone)}
+        draggingOut={cross?.from === zone && Boolean(cross.to)}
+        ghost={incoming?.rect}
+      />
+    );
+  };
 
   const side = (s: SideZone) => {
     const { mode } = sides[s];
