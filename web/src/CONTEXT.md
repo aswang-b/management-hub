@@ -60,6 +60,11 @@ The React page. Built by Vite into `web/dist`, which the server serves.
 - `tools/LinkTool.tsx`: a link or local file with favicon.
 - `tools/NotesModule.tsx`: rich-text notes (TipTap), saved to the tile's `data`.
   An optional `config.label` is shown as a heading bar.
+- `tools/PasswordsModule.tsx`: logins (name, link, username, password).
+  Entries live in `data.entries`; adding/editing goes through
+  `api.savePassword` (the server encrypts), deleting through `onData`.
+  Show/Copy fetch one password; Show hides after 30 s. Copy falls back to
+  `execCommand` where the clipboard API needs https (phone over http).
 - `tools/PluginTool.tsx`: draws any `PluginView` generically.
 - `tools/AnalyticsModule.tsx`: the analytics tile and its definition
   (`analyticsDef`: sizes, settings, metric list, "Collect now"). Display

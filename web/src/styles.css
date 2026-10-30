@@ -61,7 +61,7 @@ button:disabled { cursor: default; opacity: 0.4; }
 
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
 .field > span { font-weight: 600; font-size: 13px; }
-.field input[type="text"], .field input[type="number"], .field input:not([type]) {
+.field input[type="text"], .field input[type="number"], .field input[type="password"], .field input:not([type]) {
   border: var(--thin); padding: 8px 10px; background: var(--paper); outline: none;
 }
 .field input:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
@@ -286,6 +286,27 @@ main { padding: 16px; }
 .notes-editor p { margin: 0 0 6px; }
 .notes-editor ul, .notes-editor ol { margin: 0 0 6px; padding-left: 22px; }
 .notes-editor mark { padding: 0 1px; }
+
+/* ---- Passwords module */
+.vault { display: flex; flex-direction: column; height: 100%; position: relative; }
+.vault-head { display: flex; align-items: center; gap: 4px; padding: 0 4px 0 10px; border-bottom: var(--line); min-height: 34px; flex-shrink: 0; }
+.vault-label {
+  flex: 1; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vault-search { border: none; border-bottom: var(--thin); padding: 6px 10px; outline: none; background: var(--paper); flex-shrink: 0; }
+.vault-search:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.vault-list { flex: 1; overflow-y: auto; }
+.vault-empty { display: block; width: 100%; padding: 12px; text-align: left; }
+.vault-row { padding: 6px 4px 6px 10px; border-bottom: var(--thin); display: flex; flex-direction: column; gap: 2px; }
+.vault-line { display: flex; align-items: center; gap: 4px; min-height: 24px; }
+.vault-name { font-weight: 700; color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.vault-name:hover, a.vault-name:focus-visible { text-decoration: underline; }
+.vault-value { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vault-shown { background: var(--ink); color: var(--paper); padding: 0 4px; user-select: all; }
+.vault-note { position: absolute; left: 8px; right: 8px; bottom: 8px; background: var(--ink); color: var(--paper); padding: 6px 10px; font-size: 12px; }
+.vault-pw { display: flex; gap: 6px; font-weight: normal; }
+.vault-pw input { flex: 1; min-width: 0; }
 
 /* ---- Plugin tool */
 .plugin { display: flex; flex-direction: column; height: 100%; position: relative; }

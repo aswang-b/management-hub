@@ -25,6 +25,9 @@ More docs: `docs/ai-context/project-structure.md` (stack, scripts, file tree),
   The server port is `HUB_PORT`, not `PORT` (the browser pane sets `PORT` for dev commands).
 - `server/secrets.ts`: saves plugin tokens from the page into `.env` (`HUB_ENV_FILE`
   overrides the file). Only plugin token names are accepted; values are never sent back.
+- `server/vault.ts`: the Passwords module: passwords encrypted (AES-GCM) into the tile's
+  `data`, key file outside the project (`HUB_VAULT_KEY_FILE` overrides). Routes
+  `PUT/GET /tools/:id/passwords/:entry`; the page gets a password only on Show/Copy.
 - `server/metrics.ts`: analytics storage (`metrics` table) and the maths for tiles.
   `server/collector.ts`: the hourly job that runs each plugin's `collect`.
 - `server/plugins/*.ts`: one file per service. Each exports a `Plugin`

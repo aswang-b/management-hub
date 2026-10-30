@@ -23,6 +23,13 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
   Undo/Redo/Revert: restores name, grid width, sides, tools (with their zone)
   and their settings, but keeps each surviving tool's `data` (e.g. notes
   text) and the scratchpads.
+- `vault.ts`: the Passwords module. `saveEntry` adds/changes a login in a
+  tile's `data.entries` and encrypts its password (AES-256-GCM, `v1:iv:tag:text`
+  in `secret`); `revealPassword` decrypts one. The key is
+  `%LOCALAPPDATA%\Management Hub\vault.key` (outside OneDrive; `HUB_VAULT_KEY_FILE`
+  overrides), created on the first save. The ciphertext lives in `data`, so
+  Undo/Revert and the generic tool save keep it; plain passwords only leave
+  the server through `GET /tools/:id/passwords/:entry`.
 - `metrics.ts`: analytics storage. Creates the `metrics` table (metric, ts,
   value, tags, source; one row per metric + tags + hour). `savePoints`,
   `listSeries`, and `analytics(config)`, which combines a range, compares it
@@ -42,6 +49,8 @@ The local API and static file server. Started by `npm run dev` / `npm start`.
 | `GET/PUT /projects/:id/scratch/:side` | A side's scratchpad (`left` / `right`) |
 | `PUT /tokens/:key` | Save a plugin token to `.env` (only plugin token names; never read back) |
 | `PATCH/DELETE /tools/:id` | One tile |
+| `PUT /tools/:id/passwords/:entry` | Add or change a login in a Passwords tile (password encrypted; omit it to keep the saved one) |
+| `GET /tools/:id/passwords/:entry` | One login's password, for Show/Copy |
 | `GET /plugins` | Plugin list + which tokens are set (never the tokens) |
 | `GET /tools/:id/plugin` | Load a plugin tile (`?fresh=1` skips the cache) |
 | `POST /tools/:id/plugin/actions/:action` | Press a plugin button |

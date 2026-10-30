@@ -28,13 +28,14 @@ server/
   collector.ts          hourly job running each plugin's collect()
   links.ts              site title/favicon lookup, open local files
   secrets.ts            save plugin tokens from the page into .env
+  vault.ts              Passwords module: encrypt/decrypt passwords, key file outside the project
   check-plugins.ts      npm run check-plugins
   plugins/
     framework.ts        Plugin interface, request(), expectShape(), optional()
     index.ts            plugin registry, 60 s result cache, runLoad/runAction/runCollect, token names
     <service>.ts        one per service (current list: server/plugins/CONTEXT.md)
     plugins.test.ts     tests for every plugin and action
-  *.test.ts             metrics, db (restore), secrets, grid placement
+  *.test.ts             metrics, db (restore), secrets, vault, grid placement
 scripts/
   windows-app.ps1       npm run app:*: registers/starts/stops the "Management Hub" Windows task;
                         install opens the page in Chrome to install it as an app
@@ -49,7 +50,7 @@ web/
     useUndo.ts          builder-mode history (snapshots restored on the server)
     api.ts              fetch wrapper for /api
     components/         Workspace (zones), ZoneGrid, Scratchpad, Palette, ToolSettings, ProjectSettings, Modal, Tokens
-    tools/              registry.tsx, LinkTool, NotesModule, PluginTool, AnalyticsModule, charts
+    tools/              registry.tsx, LinkTool, NotesModule, PasswordsModule, PluginTool, AnalyticsModule, charts
     styles.css          black/white theme
 docs/
   project-brief.md      original request, API findings, planned modules

@@ -59,7 +59,9 @@ The original request, what's built so far and what's planned are in
   - **Modules** are built into the hub: **Notes**, rich text with lists,
     numbering, highlights and text colors (give a notes tile a label in its
     settings ⚙ to show a heading), and **Analytics**, charts of
-    numbers the hub saves every hour (see [Analytics](#analytics)).
+    numbers the hub saves every hour (see [Analytics](#analytics)), and
+    **Passwords**, your logins (name, login link, username, password); see
+    [Passwords](#passwords).
   - **Plugins** show live information from a service and let you take its most
     common maintenance actions without opening the service's website:
 
@@ -173,7 +175,26 @@ committed to git. The hub never shows a saved token again: to change one,
 paste a new one. (You can also edit `.env` by hand; restart the hub after.)
 
 **Your data** (projects, tools, notes, saved numbers) is one file: `data/hub.db`. Copy it to
-back up the hub.
+back up the hub. If you use a Passwords tile, also back up its key file (see below).
+
+## Passwords
+
+A **Passwords** tile keeps logins: a name, the login link, a username and a
+password. Press **+** to add one, ✎ to change it, ✕ to delete it. Click the
+name to open the login page. Passwords are hidden as •••••••• until you press
+**Show** (they hide again after 30 seconds) or **Copy**. When you edit a login,
+leave the password box empty to keep the saved password.
+
+Passwords are saved **encrypted** in `data/hub.db`. The key that unlocks them
+is a separate file, `vault.key`, in
+`C:\Users\<you>\AppData\Local\Management Hub\`, outside this folder, so
+OneDrive never has both. The hub creates it the first time you save a password.
+**Back it up along with `hub.db`**: without it, saved passwords can't be read.
+On a new computer, put it back in the same place before starting the hub.
+
+Anyone who can open the hub (this computer, or your devices on Tailscale) can
+show the passwords, so lock your computer and phone. For your most important
+accounts, a dedicated password manager with a master password is safer.
 
 ## Using it from your phone
 

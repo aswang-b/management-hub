@@ -30,6 +30,10 @@ export const api = {
   scratch: (projectId: number, side: SideZone) => call<Scratch>("GET", `/projects/${projectId}/scratch/${side}`),
   saveScratch: (projectId: number, side: SideZone, data: Scratch) => call("PUT", `/projects/${projectId}/scratch/${side}`, data),
 
+  savePassword: (toolId: string, entryId: string, entry: { name: string; url: string; username: string; password?: string }) =>
+    call<Tool>("PUT", `/tools/${toolId}/passwords/${entryId}`, entry),
+  revealPassword: (toolId: string, entryId: string) => call<{ password: string }>("GET", `/tools/${toolId}/passwords/${entryId}`),
+
   plugins: () => call<PluginMeta[]>("GET", "/plugins"),
   pluginView: (toolId: string, fresh = false) => call<PluginResult>("GET", `/tools/${toolId}/plugin${fresh ? "?fresh=1" : ""}`),
   pluginAction: (toolId: string, action: string, args?: Record<string, unknown>) =>

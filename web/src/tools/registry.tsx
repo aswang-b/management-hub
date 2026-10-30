@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { PluginConfigField, PluginMeta, Tool, ToolCategory } from "../../../shared/types.ts";
 import { LinkTool } from "./LinkTool.tsx";
 import { NotesModule } from "./NotesModule.tsx";
+import { PasswordsModule } from "./PasswordsModule.tsx";
 import { PluginTool } from "./PluginTool.tsx";
 import { AnalyticsModule, analyticsDef } from "./AnalyticsModule.tsx";
 
@@ -71,6 +72,16 @@ export function buildRegistry(plugins: PluginMeta[]): ToolDef[] {
       sizes: PANEL_SIZES,
       configFields: [{ key: "label", label: "Label (optional)", placeholder: "e.g. To do, Ideas, Launch checklist", help: "Shown as a heading at the top of the notes." }],
       render: (tool, onData) => <NotesModule tool={tool} onData={onData} />,
+    },
+    {
+      key: "passwords",
+      category: "module",
+      type: "passwords",
+      name: "Passwords",
+      description: "Logins with a link, username and an encrypted password you can show or copy.",
+      sizes: PANEL_SIZES,
+      configFields: [{ key: "label", label: "Label (optional)", placeholder: "e.g. Hosting, Email accounts", help: "Shown as the heading. Uses \"Passwords\" if empty." }],
+      render: (tool, onData) => <PasswordsModule tool={tool} onData={onData} />,
     },
     { ...analyticsDef, render: (tool) => <AnalyticsModule tool={tool} /> },
     ...plugins.map(

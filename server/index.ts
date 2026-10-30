@@ -16,6 +16,7 @@ const { saveToken } = await import("./secrets.ts");
 const { linkInfo, favicon, isLocalPath, openLocal, openUrl } = await import("./links.ts");
 const { analytics, listSeries } = await import("./metrics.ts");
 const { collectAll, lastRun, startCollector } = await import("./collector.ts");
+const { saveEntry, revealPassword } = await import("./vault.ts");
 
 const app = new Hono();
 const api = new Hono();
@@ -104,6 +105,29 @@ api.patch("/tools/:id", async (c) => {
 api.delete("/tools/:id", (c) => {
   db.deleteTool(c.req.param("id"));
   return c.json({ ok: true });
+});
+
+// ---- Password manager tiles: passwords are encrypted here and only sent
+// back one at a time, when you reveal or copy one.
+api.put("/tools/:id/passwords/:entry", async (c) => {
+  const t = db.getTool(c.req.param("id"));
+  if (!t || t.type !== "passwords") return c.json({ error: "Password tile not found" }, 404);
+  const b = await c.req.json();
+  try {
+    const data = saveEntry(t.data, c.req.param("entry"), b ?? {}, typeof b?.password === "string" ? b.password : undefined);
+    return c.json(db.updateTool(t.id, { data }));
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
+});
+api.get("/tools/:id/passwords/:entry", (c) => {
+  const t = db.getTool(c.req.param("id"));
+  if (!t || t.type !== "passwords") return c.json({ error: "Password tile not found" }, 404);
+  try {
+    return c.json({ password: revealPassword(t.data, c.req.param("entry")) }, 200, { "Cache-Control": "no-store" });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
 });
 
 // ---- Plugins
